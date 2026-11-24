@@ -11,30 +11,36 @@ Budget target: ~$0/month (local by default, free hosting tier, bring-your-own LL
 3. **Privacy first.** Local by default, `--redact` for IMSI/MSISDN/IP, nothing leaves the machine unless the user opts in.
 4. **Every rule has a test capture.** No rule ships without a fixture that triggers it and one that does not.
 
-## Phase 0: skeleton (weekend 1)
+## Phase 0: skeleton (weekend 1) - done
 
-- [ ] Python package `capsight`, CLI via `typer`, `pyproject.toml`, `uv` workflow
-- [ ] `tshark` wrapper: run with `-T ek` or `-T json`, selected fields only, stream large files
-- [ ] Internal model: `Packet`, `Transaction`, `Finding` (verdict, evidence packets, severity, fix)
-- [ ] CI: GitHub Actions, ruff, pytest, tshark installed in the runner
-- [ ] Fixture folder with public sample captures only (Wireshark sample captures, Open5GS/free5GC issue attachments with compatible licenses), each with a SOURCE note
+- [x] Python package `capsight`, CLI, `pyproject.toml`, `uv` workflow
+- [x] `tshark` wrapper: `-T ek`, selected fields only, streamed
+- [x] Internal model: `Packet`, `Transaction`, `Finding` (verdict, evidence packets, severity, fix)
+- [x] CI: GitHub Actions, ruff, pytest, tshark installed in the runner
+- [x] Test captures synthesized at test time (test-network IMSIs, RFC 5737 addresses)
+- [ ] Public sample captures with a SOURCE note (samples/public/SOURCES.md)
 
-## Phase 1: 4G attach and session failures (weekends 2-3)
+## Phase 1: 4G attach and session failures (weekends 2-3) - first rules done
 
 Correlation:
-- [ ] Diameter: pair requests and answers by hop-by-hop ID + end-to-end ID, flag unanswered requests (timeout)
-- [ ] GTPv2-C: pair by sequence number, track TEIDs per subscriber
-- [ ] NAS: link to subscriber via IMSI / GUTI where visible (plaintext NAS only)
+- [x] Diameter: pair requests and answers by hop-by-hop ID + end-to-end ID + command
+- [x] Unanswered requests flagged after a configurable timeout (`--timeout`)
+- [x] GTPv2-C: pair by sequence number and request/response type
+- [ ] NAS: link messages to a subscriber via GUTI / S1AP UE IDs when no IMSI is visible
 
-Rules (first set):
-- [ ] S6a AIR/ULR result codes: 5001 user unknown, 5420 unknown EPS subscription, 5421 RAT not allowed, 5004 roaming not allowed, 3002 unable to deliver, 3004 too busy
-- [ ] Diameter request with no answer within N seconds
-- [ ] GTPv2 Create Session Response causes: 64 context not found, 66 missing/unknown APN, 73 no resources, 78 missing mandatory IE, 92 request rejected
-- [ ] NAS Attach Reject / TAU Reject EMM causes (#3, #6, #7, #8, #11, #13, #15, #19)
-- [ ] Authentication failure: MAC failure vs synch failure (SQN out of range)
-- [ ] Output: verdict, why, where (packet numbers + timestamps), suggested fix
-
-Deliverable: `capsight analyze file.pcap` works on 10+ public captures.
+Rules:
+- [x] Diameter Result-Code / Experimental-Result-Code failures (S6a: 5001 user unknown,
+      5004 roaming not allowed, 5420 unknown EPS subscription, 5421 RAT not allowed,
+      4181 auth data unavailable; base: 3002 unable to deliver, 3004 too busy, ...)
+- [x] Diameter request with no answer
+- [x] GTPv2-C rejection causes (64 context not found, 69/70 mandatory IE, 72 system failure,
+      73 no resources, 78 missing or unknown APN, 84 IP pool exhausted, 92, 93, 100, ...)
+- [x] GTPv2-C request with no response
+- [x] NAS Attach / TAU / Service Reject with EMM cause
+- [x] Authentication Failure: MAC failure (keys mismatch) vs synch failure (SQN)
+- [x] PDN Connectivity Reject with ESM cause
+- [x] Repeated failures grouped into one finding with count and subscribers
+- [ ] Validate against 10+ public captures
 
 ## Phase 2: 5G SA (weekends 4-5)
 

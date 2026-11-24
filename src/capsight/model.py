@@ -39,3 +39,5 @@ class Finding:
     why: str
     evidence: tuple[int, ...]
     fix: str = ""
+    subscribers: tuple[str, ...] = ()
+    count: int = 1

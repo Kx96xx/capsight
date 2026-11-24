@@ -2,7 +2,7 @@
 
 **Drop in a packet capture, get a plain-English diagnosis of why your mobile network call flow failed.**
 
-> Status: early development. See [docs/PLAN.md](docs/PLAN.md) for the roadmap.
+> Status: early development. 4G core rules work today. See [docs/PLAN.md](docs/PLAN.md) for the roadmap.
 
 Debugging a 4G/5G core usually means scrolling through thousands of Diameter, GTP and NAS packets in Wireshark, looking up result codes and cause values by hand. capsight does that part for you:
 
@@ -30,6 +30,17 @@ FIX      Provision the subscriber in the HSS/UDM, or check that the
 2. **Correlate** - packets are grouped into transactions (request/answer pairs, per-subscriber flows) by session IDs, hop-by-hop IDs, TEIDs and IMSI.
 3. **Diagnose** - a deterministic rule engine matches known failure patterns (result codes, cause values, timeouts, missing answers). Every verdict cites the exact packets.
 4. **Explain (optional)** - an LLM rewrites the finding in plain language. It never invents the verdict; rules do. Works with your own API key or a local model, and is fully optional.
+
+## What it detects today
+
+- Diameter answers with a failure Result-Code or Experimental-Result-Code (e.g. S6a user unknown, roaming not allowed, RAT not allowed, unable to deliver)
+- Diameter and GTPv2-C requests that never got an answer
+- GTPv2-C rejections (e.g. missing or unknown APN, IP pool exhausted, context not found)
+- NAS Attach / TAU / Service Reject with EMM cause
+- Authentication failures (key mismatch vs sequence-number resync)
+- PDN Connectivity Reject with ESM cause
+
+Repeated failures are grouped, with a count and the subscribers affected.
 
 ## Protocols (planned)
 
