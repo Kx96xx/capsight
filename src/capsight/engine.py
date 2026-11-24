@@ -9,6 +9,7 @@ from pathlib import Path
 from capsight import fields
 from capsight.correlate import correlate_diameter, correlate_gtpv2
 from capsight.decode import read_packets
+from capsight.identity import s1ap_imsi_map
 from capsight.model import Finding, Packet
 from capsight.rules import Context, run_rules
 
@@ -34,7 +35,14 @@ def analyze_packets(capture: str, packets: list[Packet], answer_timeout: float =
     gtpv2 = correlate_gtpv2(packets)
     start = packets[0].time if packets else 0.0
     end = packets[-1].time if packets else 0.0
-    ctx = Context(packets, diameter, gtpv2, capture_end=end, answer_timeout=answer_timeout)
+    ctx = Context(
+        packets,
+        diameter,
+        gtpv2,
+        capture_end=end,
+        answer_timeout=answer_timeout,
+        inferred_imsi=s1ap_imsi_map(packets),
+    )
     return Report(
         capture=capture,
         packets=len(packets),

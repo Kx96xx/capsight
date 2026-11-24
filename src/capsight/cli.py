@@ -27,8 +27,10 @@ def render_text(report: Report) -> str:
             else "no mobile-core signalling found"
         )
     )
-    if not report.findings:
+    problems = [f for f in report.findings if f.severity != "info"]
+    if not problems:
         lines += ["", "No known failure patterns found."]
+    if not report.findings:
         return "\n".join(lines)
     for finding in report.findings:
         lines += ["", f"{finding.severity.upper():<9} {finding.verdict}"]

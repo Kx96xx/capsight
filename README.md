@@ -42,6 +42,8 @@ FIX      Provision the subscriber in the HSS/UDM, or check that the
 
 Repeated failures are grouped, with a count and the subscribers affected.
 
+Checked against real public captures: see [docs/VALIDATION.md](docs/VALIDATION.md).
+
 ## Protocols (planned)
 
 | Protocol | Interface | Phase |

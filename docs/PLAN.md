@@ -26,7 +26,7 @@ Correlation:
 - [x] Diameter: pair requests and answers by hop-by-hop ID + end-to-end ID + command
 - [x] Unanswered requests flagged after a configurable timeout (`--timeout`)
 - [x] GTPv2-C: pair by sequence number and request/response type
-- [ ] NAS: link messages to a subscriber via GUTI / S1AP UE IDs when no IMSI is visible
+- [x] NAS: link messages to a subscriber via S1AP eNB-UE-S1AP-ID when no IMSI is visible
 
 Rules:
 - [x] Diameter Result-Code / Experimental-Result-Code failures (S6a: 5001 user unknown,
@@ -40,7 +40,9 @@ Rules:
 - [x] Authentication Failure: MAC failure (keys mismatch) vs synch failure (SQN)
 - [x] PDN Connectivity Reject with ESM cause
 - [x] Repeated failures grouped into one finding with count and subscribers
-- [ ] Validate against 10+ public captures
+- [x] Validated on the 5 CoLTE public captures, 5/5 correct (docs/VALIDATION.md)
+- [ ] Validate against 10+ public captures (need roaming, GTPv2 reject and 5G samples)
+- [x] Sync failure followed by a successful Authentication Response reported as info, not a failure
 
 ## Phase 2: 5G SA (weekends 4-5)
 

@@ -12,8 +12,14 @@ def nas_packet(
     emm_cause: int | None = None,
     esm_type: int | None = None,
     esm_cause: int | None = None,
+    imsi: str | None = "001010000000001",
+    enb_id: str | None = None,
 ) -> Packet:
-    fields: dict[str, list[str]] = {"e212.imsi": ["001010000000001"]}
+    fields: dict[str, list[str]] = {}
+    if imsi:
+        fields["e212.imsi"] = [imsi]
+    if enb_id:
+        fields["s1ap.ENB_UE_S1AP_ID"] = [enb_id]
     if emm_type is not None:
         fields["nas-eps.nas_msg_emm_type"] = [hex(emm_type)]
     if emm_cause is not None:
@@ -53,3 +59,32 @@ def test_pdn_connectivity_reject():
 def test_unknown_cause_still_reported():
     [finding] = analyze_packets("x", [nas_packet(1, emm_type=0x44, emm_cause=99)]).findings
     assert "code 99" in finding.verdict
+
+
+def test_imsi_inferred_from_s1ap_id():
+    packets = [
+        nas_packet(1, emm_type=0x41, enb_id="7"),  # Attach Request carries the IMSI
+        nas_packet(2, emm_type=0x44, emm_cause=8, imsi=None, enb_id="7"),
+    ]
+    [finding] = analyze_packets("x", packets).findings
+    assert finding.subscribers == ("001010000000001",)
+
+
+def test_imsi_not_inferred_across_ue_ids():
+    packets = [
+        nas_packet(1, emm_type=0x41, enb_id="7"),
+        nas_packet(2, emm_type=0x44, emm_cause=8, imsi=None, enb_id="8"),
+    ]
+    [finding] = analyze_packets("x", packets).findings
+    assert finding.subscribers == ()
+
+
+def test_sync_failure_followed_by_success_is_info():
+    packets = [
+        nas_packet(1, emm_type=0x41, enb_id="3"),
+        nas_packet(2, emm_type=0x5C, emm_cause=21, imsi=None, enb_id="3"),
+        nas_packet(3, emm_type=0x53, imsi=None, enb_id="3"),
+    ]
+    [finding] = analyze_packets("x", packets).findings
+    assert finding.severity == Severity.INFO
+    assert "resync" in finding.verdict

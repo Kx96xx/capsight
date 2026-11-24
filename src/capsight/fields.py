@@ -27,8 +27,8 @@ NAS_EPS = (
     "nas-eps.esm.cause",
 )
 
-IDENTITY = ("e212.imsi",)
+IDENTITY = ("e212.imsi", "s1ap.ENB_UE_S1AP_ID", "s1ap.MME_UE_S1AP_ID")
 
 ALL = (*DIAMETER, *GTPV2, *NAS_EPS, *IDENTITY)
 
-DISPLAY_FILTER = "diameter or gtpv2 or nas-eps"
+DISPLAY_FILTER = "diameter or gtpv2 or nas-eps or s1ap"
