@@ -155,8 +155,14 @@ def ie_apn(apn: str) -> bytes:
     return _ie(71, data)
 
 
-def ie_cause(cause: int) -> bytes:
-    return _ie(2, bytes([cause, 0]))
+def ie_cause(cause: int, remote: bool = False) -> bytes:
+    # flags octet: bit 0 = CS (cause source: 1 = originated by a remote node)
+    return _ie(2, bytes([cause, 0x01 if remote else 0x00]))
+
+
+def ie_pdn_type(pdn_type: int) -> bytes:
+    """1 = IPv4, 2 = IPv6, 3 = IPv4v6."""
+    return _ie(99, bytes([pdn_type]))
 
 
 def gtpv2(msg_type: int, seq: int, ies: list[bytes], teid: int = 0) -> bytes:
@@ -175,3 +181,19 @@ def gtpv2(msg_type: int, seq: int, ies: list[bytes], teid: int = 0) -> bytes:
 def gtpv2_frame(from_a: bool, payload: bytes) -> bytes:
     src, dst = (HOST_A, HOST_B) if from_a else (HOST_B, HOST_A)
     return udp_frame(src, dst, 2123, 2123, payload)
+
+
+# ---- RADIUS -----------------------------------------------------------------------------
+
+AAA_HOST = bytes([192, 0, 2, 30])
+
+
+def radius(code: int, ident: int, attrs: list[tuple[int, bytes]] = ()) -> bytes:
+    body = b"".join(bytes([t, 2 + len(v)]) + v for t, v in attrs)
+    return struct.pack("!BBH", code, ident, 20 + len(body)) + b"\x00" * 16 + body
+
+
+def radius_frame(from_gateway: bool, payload: bytes) -> bytes:
+    src, dst = (HOST_B, AAA_HOST) if from_gateway else (AAA_HOST, HOST_B)
+    sport, dport = (40100, 1812) if from_gateway else (1812, 40100)
+    return udp_frame(src, dst, sport, dport, payload)
