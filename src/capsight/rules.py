@@ -34,6 +34,10 @@ class Context:
     gtpv2: list[Transaction]
     capture_end: float
     answer_timeout: float = 5.0
+    inferred_imsi: dict[int, str] = field(default_factory=dict)
+
+    def imsi_of(self, packet: Packet) -> str | None:
+        return packet.first("e212.imsi") or self.inferred_imsi.get(packet.number)
 
 
 @dataclass
@@ -201,21 +205,34 @@ def nas_rejects(ctx: Context) -> Iterator[Finding]:
                     fix=code.hint,
                     severity=Severity.FAILURE,
                 )
-            _add(groups[key], [packet], packet.first("e212.imsi"))
+            _add(groups[key], [packet], ctx.imsi_of(packet))
         elif mtype == 0x5C:  # Authentication Failure, sent by the UE
             cause = to_int(packet.first("nas-eps.emm.cause"))
             if cause is None:
                 continue
             code = lookup(AUTH_FAILURE_CAUSE, cause)
-            key = ("auth", cause)
+            imsi = ctx.imsi_of(packet)
+            recovered = cause == 21 and _auth_recovered(ctx, packet, imsi)
+            key = ("auth", cause, recovered)
             if key not in groups:
-                groups[key] = _Group(
-                    verdict=f"Device rejected network authentication: {code.name}.",
-                    why=f"The device sent Authentication Failure, cause #{cause} ({code.name}).",
-                    fix=code.hint,
-                    severity=Severity.WARNING if cause == 21 else Severity.FAILURE,
-                )
-            _add(groups[key], [packet], packet.first("e212.imsi"))
+                if recovered:
+                    groups[key] = _Group(
+                        verdict="Sequence-number resync, then authentication succeeded.",
+                        why=f"The device sent Authentication Failure, cause #{cause} "
+                        f"({code.name}), and the next Authentication Response succeeded.",
+                        fix="No action. This is normal on a SIM's first attach to a network "
+                        "and after the HSS loses SQN state.",
+                        severity=Severity.INFO,
+                    )
+                else:
+                    groups[key] = _Group(
+                        verdict=f"Device rejected network authentication: {code.name}.",
+                        why=f"The device sent Authentication Failure, cause #{cause} "
+                        f"({code.name}).",
+                        fix=code.hint,
+                        severity=Severity.WARNING if cause == 21 else Severity.FAILURE,
+                    )
+            _add(groups[key], [packet], imsi)
     yield from _emit("nas.emm.reject", groups)
 
 
@@ -238,8 +255,27 @@ def esm_rejects(ctx: Context) -> Iterator[Finding]:
                 fix=code.hint,
                 severity=Severity.FAILURE,
             )
-        _add(groups[cause], [packet], packet.first("e212.imsi"))
+        _add(groups[cause], [packet], ctx.imsi_of(packet))
     yield from _emit("nas.esm.reject", groups)
+
+
+AUTH_RESPONSE = 0x53
+
+
+def _auth_recovered(ctx: Context, failure: Packet, imsi: str | None) -> bool:
+    """True if the same UE sends a successful Authentication Response after `failure`."""
+    enb_id = failure.first("s1ap.ENB_UE_S1AP_ID")
+    for packet in ctx.packets:
+        if packet.number <= failure.number or not packet.has("nas-eps"):
+            continue
+        if to_int(packet.first("nas-eps.nas_msg_emm_type")) != AUTH_RESPONSE:
+            continue
+        same_ue = (imsi is not None and ctx.imsi_of(packet) == imsi) or (
+            enb_id is not None and packet.first("s1ap.ENB_UE_S1AP_ID") == enb_id
+        )
+        if same_ue:
+            return True
+    return False
 
 
 def run_rules(ctx: Context) -> list[Finding]:
