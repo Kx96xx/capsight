@@ -60,6 +60,12 @@ def main(argv: list[str] | None = None) -> int:
         default=5.0,
         help="seconds without an answer before a request counts as unanswered (default 5)",
     )
+    analyze_cmd.add_argument(
+        "--fail-on",
+        choices=("failure", "warning", "never"),
+        default="never",
+        help="exit with code 1 if a finding at this severity or worse is found (for CI/scripts)",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -68,7 +74,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(asdict(report), indent=2) if args.format == "json" else render_text(report))
-    return 0
+    return 1 if _should_fail(report, args.fail_on) else 0
+
+
+def _should_fail(report: Report, fail_on: str) -> bool:
+    if fail_on == "never":
+        return False
+    levels = {"failure"} if fail_on == "failure" else {"failure", "warning"}
+    return any(f.severity in levels for f in report.findings)
 
 
 if __name__ == "__main__":

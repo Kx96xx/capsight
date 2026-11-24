@@ -25,3 +25,10 @@ def test_analyze_text_shows_finding(ula_user_unknown, capsys):
     out = capsys.readouterr().out
     assert "FAILURE   ULR rejected: DIAMETER_ERROR_USER_UNKNOWN." in out
     assert "WHERE     packets #3, #4" in out
+
+
+@needs_tshark
+def test_fail_on_failure_sets_exit_code(ula_user_unknown, healthy_attach):
+    assert main(["analyze", str(ula_user_unknown), "--fail-on", "failure"]) == 1
+    assert main(["analyze", str(healthy_attach), "--fail-on", "failure"]) == 0
+    assert main(["analyze", str(ula_user_unknown)]) == 0
