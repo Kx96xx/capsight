@@ -20,7 +20,7 @@ from capsight.codes import (
     GTPV2_CAUSE,
     lookup,
 )
-from capsight.correlate import Transaction, to_int
+from capsight.correlate import Transaction, to_bool, to_int
 from capsight.model import Finding, Packet, Severity
 
 MAX_EVIDENCE = 5
@@ -49,6 +49,7 @@ class _Group:
     evidence: list[int] = field(default_factory=list)
     imsis: set[str] = field(default_factory=set)
     count: int = 0
+    retransmissions: int = 0
 
 
 Rule = Callable[[Context], Iterator[Finding]]
@@ -71,6 +72,11 @@ def _emit(rule_id: str, groups: dict[object, _Group]) -> Iterator[Finding]:
             if len(group.imsis) > 1:
                 why += f" across {len(group.imsis)} subscribers"
             why += "."
+        if group.retransmissions:
+            why += (
+                f" Plus {group.retransmissions} retransmitted copies, not counted as "
+                "separate failures."
+            )
         yield Finding(
             rule_id=rule_id,
             severity=group.severity,
@@ -139,6 +145,31 @@ def diameter_unanswered(ctx: Context) -> Iterator[Finding]:
     yield from _emit("diameter.unanswered", groups)
 
 
+PDN_TYPES = {1: "IPv4", 2: "IPv6", 3: "IPv4v6", 4: "non-IP", 5: "Ethernet"}
+GTP_USER_AUTH_FAILED = 92
+GTP_PDN_TYPE_NOT_SUPPORTED = 83
+RADIUS_ACCESS_ACCEPT = 2
+RADIUS_LOOKBACK_S = 2.0
+
+
+def _cause_source(answer: Packet) -> str:
+    """GTPv2 CS bit: 1 = the cause came from a node further down the path."""
+    return "remote" if to_bool(answer.first("gtpv2.cs")) else "local"
+
+
+def _radius_accept_before(ctx: Context, answer: Packet) -> Packet | None:
+    """Most recent RADIUS Access-Accept within RADIUS_LOOKBACK_S before `answer`."""
+    best = None
+    for packet in ctx.packets:
+        if packet.number >= answer.number:
+            break
+        if not packet.has("radius") or answer.time - packet.time > RADIUS_LOOKBACK_S:
+            continue
+        if to_int(packet.first("radius.code")) == RADIUS_ACCESS_ACCEPT:
+            best = packet
+    return best
+
+
 @rule("gtpv2.cause")
 def gtpv2_rejects(ctx: Context) -> Iterator[Finding]:
     groups: dict[object, _Group] = {}
@@ -149,19 +180,81 @@ def gtpv2_rejects(ctx: Context) -> Iterator[Finding]:
         if cause is None or 16 <= cause <= 63:
             continue
         code = lookup(GTPV2_CAUSE, cause)
-        key = (tx.name, cause)
+        source = _cause_source(tx.answer)
+        accept = _radius_accept_before(ctx, tx.answer) if cause == GTP_USER_AUTH_FAILED else None
+        key = (tx.name, cause, source, accept is not None)
         if key not in groups:
             apn = tx.request.first("gtpv2.apn") if tx.request else None
             why = f"Response carried cause {cause} ({code.name})"
             why += f" for APN {apn}." if apn else "."
+            why += (
+                " The cause was raised by a node further down the path, not by the responder."
+                if source == "remote"
+                else " The responding node raised the cause itself."
+            )
+            fix = code.hint
+            if accept is not None:
+                why += (
+                    f" RADIUS returned Access-Accept (packet #{accept.number}) just before, so "
+                    "the credentials were accepted."
+                )
+                fix = (
+                    "Not a credential problem: RADIUS accepted the user but the gateway still "
+                    "refused the session. Compare this Access-Accept with one from a working "
+                    "session on the same gateway; look for a missing or different attribute "
+                    "(e.g. Framed-IP, Called-Station-Id, a vendor-specific policy)."
+                )
             groups[key] = _Group(
                 verdict=f"{tx.name} rejected: {code.name}.",
                 why=why,
-                fix=code.hint,
+                fix=fix,
                 severity=Severity.FAILURE,
             )
-        _add(groups[key], [p for p in (tx.request, tx.answer) if p], tx.imsi)
+        group = groups[key]
+        _add(group, [p for p in (tx.request, tx.answer) if p], tx.imsi)
+        group.retransmissions += tx.retransmissions
     yield from _emit("gtpv2.cause", groups)
+
+
+@rule("gtpv2.pdn_type")
+def pdn_type_split(ctx: Context) -> Iterator[Finding]:
+    """Same subscriber: one PDN type accepted, another rejected with cause 83."""
+    accepted: dict[str, set[int]] = {}
+    rejected: dict[str, list[Transaction]] = {}
+    for tx in ctx.gtpv2:
+        if tx.request is None or tx.answer is None or not tx.imsi:
+            continue
+        pdn_type = to_int(tx.request.first("gtpv2.pdn_type"))
+        cause = to_int(tx.answer.first("gtpv2.cause"))
+        if pdn_type is None or cause is None:
+            continue
+        if 16 <= cause <= 63:
+            accepted.setdefault(tx.imsi, set()).add(pdn_type)
+        elif cause == GTP_PDN_TYPE_NOT_SUPPORTED:
+            rejected.setdefault(tx.imsi, []).append(tx)
+    groups: dict[object, _Group] = {}
+    for imsi, txs in rejected.items():
+        ok_types = accepted.get(imsi, set())
+        for tx in txs:
+            assert tx.request is not None and tx.answer is not None
+            bad = to_int(tx.request.first("gtpv2.pdn_type"))
+            if bad in ok_types or not ok_types:
+                continue
+            ok_names = "/".join(PDN_TYPES.get(t, str(t)) for t in sorted(ok_types))
+            bad_name = PDN_TYPES.get(bad, str(bad))
+            key = (bad, tuple(sorted(ok_types)))
+            if key not in groups:
+                groups[key] = _Group(
+                    verdict=f"{bad_name} sessions rejected while {ok_names} works.",
+                    why=f"The same subscriber got cause 83 (Preferred PDN Type not supported) "
+                    f"when requesting {bad_name}, and acceptance when requesting {ok_names}. "
+                    "The failure follows the PDN type, not the APN or the subscription.",
+                    fix=f"Either enable {bad_name} for this APN on the gateway, or set the "
+                    f"device/APN profile to request {ok_names}.",
+                    severity=Severity.FAILURE,
+                )
+            _add(groups[key], [tx.request, tx.answer], imsi)
+    yield from _emit("gtpv2.pdn_type", groups)
 
 
 @rule("gtpv2.unanswered")
@@ -248,18 +341,55 @@ def esm_rejects(ctx: Context) -> Iterator[Finding]:
         if cause is None:
             continue
         code = lookup(ESM_CAUSE, cause)
-        if cause not in groups:
-            groups[cause] = _Group(
-                verdict=f"PDN connectivity rejected: {code.name}.",
-                why=f"The network sent PDN Connectivity Reject, ESM cause #{cause} ({code.name}).",
-                fix=code.hint,
-                severity=Severity.FAILURE,
-            )
-        _add(groups[cause], [packet], ctx.imsi_of(packet))
+        imsi = ctx.imsi_of(packet)
+        after_attach = _attach_accepted_before(ctx, packet, imsi)
+        key = (cause, after_attach)
+        if key not in groups:
+            if after_attach:
+                groups[key] = _Group(
+                    verdict=f"Extra PDN connection rejected: {code.name}.",
+                    why=f"The device attached and got its default bearer, then asked for an "
+                    f"additional PDN connection, which was rejected with ESM cause #{cause} "
+                    f"({code.name}). Data on the default APN works.",
+                    fix=code.hint
+                    or "Check which extra APN the device requests and whether the subscription "
+                    "includes it.",
+                    severity=Severity.WARNING,
+                )
+            else:
+                groups[key] = _Group(
+                    verdict=f"PDN connectivity rejected: {code.name}.",
+                    why=f"The network sent PDN Connectivity Reject, ESM cause #{cause} "
+                    f"({code.name}).",
+                    fix=code.hint,
+                    severity=Severity.FAILURE,
+                )
+        _add(groups[key], [packet], imsi)
     yield from _emit("nas.esm.reject", groups)
 
 
 AUTH_RESPONSE = 0x53
+ATTACH_ACCEPT = 0x42
+
+
+def _same_ue(ctx: Context, a: Packet, b: Packet, imsi: str | None) -> bool:
+    enb_id = a.first("s1ap.ENB_UE_S1AP_ID")
+    return (imsi is not None and ctx.imsi_of(b) == imsi) or (
+        enb_id is not None and b.first("s1ap.ENB_UE_S1AP_ID") == enb_id
+    )
+
+
+def _attach_accepted_before(ctx: Context, packet: Packet, imsi: str | None) -> bool:
+    for other in ctx.packets:
+        if other.number >= packet.number:
+            return False
+        if (
+            other.has("nas-eps")
+            and to_int(other.first("nas-eps.nas_msg_emm_type")) == ATTACH_ACCEPT
+            and _same_ue(ctx, packet, other, imsi)
+        ):
+            return True
+    return False
 
 
 def _auth_recovered(ctx: Context, failure: Packet, imsi: str | None) -> bool:

@@ -32,6 +32,7 @@ class Transaction:
     request: Packet | None
     answer: Packet | None = None
     imsi: str | None = None
+    retransmissions: int = 0
 
     @property
     def first_packet(self) -> Packet:
@@ -88,10 +89,18 @@ def correlate_diameter(packets: Iterable[Packet]) -> list[Transaction]:
     return sorted(done, key=lambda t: t.first_packet.number)
 
 
+RETRANSMIT_WINDOW = 10.0  # seconds; GTPv2-C sequence numbers wrap far slower than this
+
+
 def correlate_gtpv2(packets: Iterable[Packet]) -> list[Transaction]:
-    """Pair GTPv2-C requests and responses by sequence number and message type."""
+    """Pair GTPv2-C requests and responses by sequence number and message type.
+
+    Retransmitted requests and repeated responses (same sequence number) are folded into
+    one transaction and counted, so a retransmission storm is not mistaken for many failures.
+    """
     responses = {v: k for k, v in GTPV2_PAIRS.items()}
     open_requests: dict[tuple[int, int], Transaction] = {}
+    answered: dict[tuple[int, int], Transaction] = {}
     done: list[Transaction] = []
     for packet in packets:
         if not packet.has("gtpv2"):
@@ -101,19 +110,43 @@ def correlate_gtpv2(packets: Iterable[Packet]) -> list[Transaction]:
         if mtype is None or seq is None:
             continue
         if mtype in GTPV2_PAIRS:
+            key = (seq, GTPV2_PAIRS[mtype])
+            if key in open_requests:
+                open_requests[key].retransmissions += 1
+                continue
+            previous = answered.get(key)
+            if (
+                previous is not None
+                and previous.request is not None
+                and packet.time - previous.request.time < RETRANSMIT_WINDOW
+                and packet.first("e212.imsi") == previous.imsi
+            ):
+                # retransmitted request after the answer was already sent
+                previous.retransmissions += 1
+                continue
             tx = Transaction(
                 "gtpv2",
                 GTPV2_MESSAGES.get(mtype, f"GTPv2 type {mtype}"),
                 packet,
                 imsi=packet.first("e212.imsi"),
             )
-            open_requests[(seq, GTPV2_PAIRS[mtype])] = tx
+            open_requests[key] = tx
         elif mtype in responses:
-            tx = open_requests.pop((seq, mtype), None)
+            key = (seq, mtype)
+            tx = open_requests.pop(key, None)
             if tx is None:
+                previous = answered.get(key)
+                if (
+                    previous is not None
+                    and previous.answer is not None
+                    and packet.time - previous.answer.time < RETRANSMIT_WINDOW
+                ):
+                    # repeated answer to a retransmitted request; already counted there
+                    continue
                 req_type = responses[mtype]
                 tx = Transaction("gtpv2", GTPV2_MESSAGES.get(req_type, str(req_type)), None)
             tx.answer = packet
+            answered[key] = tx
             done.append(tx)
     done.extend(open_requests.values())
     return sorted(done, key=lambda t: t.first_packet.number)

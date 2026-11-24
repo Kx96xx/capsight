@@ -19,6 +19,22 @@ Source: <https://blog.colte.network/pcap-library> (`pcaps.zip`). A single-machin
 
 5 of 5 match the documented outcome, with no false alarms on the three healthy captures.
 
+## Operator failure patterns
+
+The tests in `tests/test_operator_patterns.py` reproduce failure shapes seen in a production
+mobile core. They were derived by reading production traces locally; only the pattern was
+kept (message, cause, what preceded it). The captures are generated from scratch with
+test-network identities, so no production data is in this repository.
+
+| Pattern | What capsight now reports |
+|---|---|
+| Gateway rejects a session with GTPv2 cause 92 right after RADIUS returned Access-Accept | Points out the credentials were accepted, so the problem is an authorization attribute mismatch, not a password/key |
+| The same subscriber's IPv4v6 request gets cause 83 while IPv4 is accepted | "IPv4v6 sessions rejected while IPv4 works": the failure follows the PDN type, not the APN |
+| A peer retransmits a rejected request many times | One failure plus a retransmission count, instead of a storm of findings |
+| A device keeps retrying with fresh requests and keeps getting rejected | Every attempt counted, as a real loop |
+| Attach and default bearer succeed, then an extra APN is rejected (ESM #33) | Warning, not failure: data on the default APN works |
+| GTPv2 cause source bit set | Says whether the responder or a node further down the path raised the cause |
+
 ## Wanted
 
 More public captures, especially: roaming rejects, GTPv2 rejections from a real gateway,
