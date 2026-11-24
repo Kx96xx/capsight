@@ -371,6 +371,19 @@ def esm_rejects(ctx: Context) -> Iterator[Finding]:
 AUTH_RESPONSE = 0x53
 ATTACH_ACCEPT = 0x42
 
+# A more specific finding replaces a generic one that cites only the same packets.
+SUPERSEDES = {"gtpv2.pdn_type": "gtpv2.cause"}
+
+
+def _drop_superseded(findings: list[Finding]) -> list[Finding]:
+    covered: dict[str, set[int]] = {}
+    for f in findings:
+        if f.rule_id in SUPERSEDES:
+            covered.setdefault(SUPERSEDES[f.rule_id], set()).update(f.evidence)
+    return [
+        f for f in findings if not (f.rule_id in covered and set(f.evidence) <= covered[f.rule_id])
+    ]
+
 
 def _same_ue(ctx: Context, a: Packet, b: Packet, imsi: str | None) -> bool:
     enb_id = a.first("s1ap.ENB_UE_S1AP_ID")
@@ -412,5 +425,6 @@ def run_rules(ctx: Context) -> list[Finding]:
     findings: list[Finding] = []
     for _rule_id, fn in RULES:
         findings.extend(fn(ctx))
+    findings = _drop_superseded(findings)
     order = {Severity.FAILURE: 0, Severity.WARNING: 1, Severity.INFO: 2}
     return sorted(findings, key=lambda f: (order[f.severity], f.evidence[0] if f.evidence else 0))

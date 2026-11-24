@@ -72,6 +72,7 @@ def test_pdn_type_split(tmp_path):
     assert len(split) == 1
     assert split[0].verdict == "IPv4v6 sessions rejected while IPv4 works."
     assert "follows the PDN type, not the APN" in split[0].why
+    assert [f.rule_id for f in findings] == ["gtpv2.pdn_type"]  # generic reject superseded
 
 
 def test_retransmission_storm_is_one_failure(tmp_path):
