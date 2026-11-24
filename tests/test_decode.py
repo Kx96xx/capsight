@@ -1,11 +1,8 @@
 import json
-import shutil
 
-import pytest
+from conftest import needs_tshark
 
 from capsight.decode import build_command, parse_ek_line, read_packets
-
-needs_tshark = pytest.mark.skipif(shutil.which("tshark") is None, reason="tshark not installed")
 
 
 def test_index_lines_are_skipped():

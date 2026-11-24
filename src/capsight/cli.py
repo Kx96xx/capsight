@@ -1,61 +1,47 @@
-"""Command line entry point."""
+"""capsight: plain-English diagnosis of mobile-core packet captures."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import sys
-from collections import Counter
+from dataclasses import asdict
 from pathlib import Path
 
 from capsight import __version__
-from capsight.decode import TsharkError, read_packets
-
-# Protocols capsight will diagnose, in display order.
-CORE_PROTOCOLS = (
-    "diameter",
-    "gtpv2",
-    "gtp",
-    "nas-eps",
-    "s1ap",
-    "ngap",
-    "nas-5gs",
-    "pfcp",
-    "http2",
-    "sip",
-)
+from capsight.decode import TsharkError
+from capsight.engine import Report, analyze
 
 
-def summarize(capture: Path) -> dict:
-    counts: Counter[str] = Counter()
-    total = 0
-    first = last = None
-    for packet in read_packets(capture):
-        total += 1
-        first = packet.time if first is None else first
-        last = packet.time
-        for proto in set(packet.protocols) & set(CORE_PROTOCOLS):
-            counts[proto] += 1
-    return {
-        "capture": str(capture),
-        "packets": total,
-        "duration_s": round((last or 0) - (first or 0), 3),
-        "core_protocols": {p: counts[p] for p in CORE_PROTOCOLS if counts[p]},
-        "findings": [],
-    }
-
-
-def render_text(summary: dict) -> str:
+def render_text(report: Report) -> str:
     lines = [
-        f"capture   {summary['capture']}",
-        f"packets   {summary['packets']}  ({summary['duration_s']} s)",
+        f"capture   {report.capture}",
+        f"packets   {report.packets}  ({report.duration_s} s)",
     ]
-    protos = summary["core_protocols"]
-    if protos:
-        lines.append("protocols " + ", ".join(f"{p}={n}" for p, n in protos.items()))
-    else:
-        lines.append("protocols no mobile-core signalling found")
-    lines.append("findings  none yet (rule engine lands in phase 1)")
+    protos = report.core_protocols
+    lines.append(
+        "protocols "
+        + (
+            ", ".join(f"{p}={n}" for p, n in protos.items())
+            if protos
+            else "no mobile-core signalling found"
+        )
+    )
+    if not report.findings:
+        lines += ["", "No known failure patterns found."]
+        return "\n".join(lines)
+    for finding in report.findings:
+        lines += ["", f"{finding.severity.upper():<9} {finding.verdict}"]
+        lines.append(f"{'WHY':<9} {finding.why}")
+        if finding.subscribers:
+            shown = ", ".join(finding.subscribers[:3])
+            more = (
+                f" (+{len(finding.subscribers) - 3} more)" if len(finding.subscribers) > 3 else ""
+            )
+            lines.append(f"{'WHO':<9} {shown}{more}")
+        lines.append(f"{'WHERE':<9} packets " + ", ".join(f"#{n}" for n in finding.evidence))
+        if finding.fix:
+            lines.append(f"{'FIX':<9} {finding.fix}")
     return "\n".join(lines)
 
 
@@ -63,17 +49,23 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="capsight", description=__doc__)
     parser.add_argument("--version", action="version", version=f"capsight {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
-    analyze = sub.add_parser("analyze", help="analyze a capture file")
-    analyze.add_argument("capture", type=Path)
-    analyze.add_argument("--format", choices=("text", "json"), default="text")
+    analyze_cmd = sub.add_parser("analyze", help="analyze a capture file")
+    analyze_cmd.add_argument("capture", type=Path)
+    analyze_cmd.add_argument("--format", choices=("text", "json"), default="text")
+    analyze_cmd.add_argument(
+        "--timeout",
+        type=float,
+        default=5.0,
+        help="seconds without an answer before a request counts as unanswered (default 5)",
+    )
     args = parser.parse_args(argv)
 
     try:
-        summary = summarize(args.capture)
+        report = analyze(args.capture, answer_timeout=args.timeout)
     except TsharkError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    print(json.dumps(summary, indent=2) if args.format == "json" else render_text(summary))
+    print(json.dumps(asdict(report), indent=2) if args.format == "json" else render_text(report))
     return 0
 
 

@@ -1,11 +1,8 @@
 import json
-import shutil
 
-import pytest
+from conftest import needs_tshark
 
 from capsight.cli import main
-
-needs_tshark = pytest.mark.skipif(shutil.which("tshark") is None, reason="tshark not installed")
 
 
 def test_missing_capture_returns_error(tmp_path, capsys):
@@ -20,3 +17,11 @@ def test_analyze_json(plain_udp_capture, capsys):
     assert out["packets"] == 3
     assert out["core_protocols"] == {}
     assert out["findings"] == []
+
+
+@needs_tshark
+def test_analyze_text_shows_finding(ula_user_unknown, capsys):
+    assert main(["analyze", str(ula_user_unknown)]) == 0
+    out = capsys.readouterr().out
+    assert "FAILURE   ULR rejected: DIAMETER_ERROR_USER_UNKNOWN." in out
+    assert "WHERE     packets #3, #4" in out

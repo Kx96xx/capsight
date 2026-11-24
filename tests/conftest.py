@@ -1,41 +1,82 @@
-"""Test fixtures. Captures are synthesized at test time so no real traffic is ever committed."""
+"""Shared fixtures. Captures are synthesized at test time; see tests/pcapgen.py."""
 
 from __future__ import annotations
 
-import struct
+import shutil
 from pathlib import Path
 
 import pytest
+from pcapgen import (
+    HOST_A,
+    HOST_B,
+    TcpFlow,
+    gtpv2,
+    gtpv2_frame,
+    ie_apn,
+    ie_cause,
+    ie_imsi,
+    s6a_answer,
+    s6a_request,
+    udp_frame,
+    write_pcap,
+)
 
+needs_tshark = pytest.mark.skipif(shutil.which("tshark") is None, reason="tshark not installed")
 
-def _udp_frame(src_port: int, dst_port: int, payload: bytes) -> bytes:
-    udp = struct.pack("!HHHH", src_port, dst_port, 8 + len(payload), 0) + payload
-    ip_header = struct.pack(
-        "!BBHHHBBH4s4s",
-        0x45,
-        0,
-        20 + len(udp),
-        1,
-        0,
-        64,
-        17,
-        0,
-        bytes([192, 0, 2, 1]),
-        bytes([192, 0, 2, 2]),  # RFC 5737 documentation range
-    )
-    eth = b"\x02\x00\x00\x00\x00\x02" + b"\x02\x00\x00\x00\x00\x01" + b"\x08\x00"
-    return eth + ip_header + udp
-
-
-def write_pcap(path: Path, frames: list[bytes]) -> Path:
-    with path.open("wb") as fh:
-        fh.write(struct.pack("<IHHiIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1))
-        for i, frame in enumerate(frames):
-            fh.write(struct.pack("<IIII", 1_700_000_000 + i, 0, len(frame), len(frame)))
-            fh.write(frame)
-    return path
+T0 = 1_700_000_000.0
 
 
 @pytest.fixture
 def plain_udp_capture(tmp_path: Path) -> Path:
-    return write_pcap(tmp_path / "udp.pcap", [_udp_frame(40000, 9999, b"hello")] * 3)
+    frame = udp_frame(HOST_A, HOST_B, 40000, 9999, b"hello")
+    return write_pcap(tmp_path / "udp.pcap", [(T0 + i, frame) for i in range(3)])
+
+
+@pytest.fixture
+def ula_user_unknown(tmp_path: Path) -> Path:
+    """AIR ok, then ULR answered with Experimental-Result-Code 5001."""
+    flow = TcpFlow(HOST_A, HOST_B, 40001, 3868)
+    frames = [
+        (T0, flow.frame(True, s6a_request(318, 0x100))),
+        (T0 + 0.01, flow.frame(False, s6a_answer(318, 0x100, result=2001))),
+        (T0 + 0.10, flow.frame(True, s6a_request(316, 0x101))),
+        (T0 + 0.11, flow.frame(False, s6a_answer(316, 0x101, experimental=5001))),
+    ]
+    return write_pcap(tmp_path / "ula-5001.pcap", frames)
+
+
+@pytest.fixture
+def diameter_timeout(tmp_path: Path) -> Path:
+    """An AIR that is never answered, followed by unrelated traffic 10 s later."""
+    flow = TcpFlow(HOST_A, HOST_B, 40002, 3868)
+    frames = [
+        (T0, flow.frame(True, s6a_request(318, 0x200))),
+        (T0 + 10, udp_frame(HOST_A, HOST_B, 40000, 9999, b"x")),
+    ]
+    return write_pcap(tmp_path / "air-timeout.pcap", frames)
+
+
+@pytest.fixture
+def healthy_attach(tmp_path: Path) -> Path:
+    flow = TcpFlow(HOST_A, HOST_B, 40003, 3868)
+    frames = [
+        (T0, flow.frame(True, s6a_request(318, 0x300))),
+        (T0 + 0.01, flow.frame(False, s6a_answer(318, 0x300))),
+        (T0 + 0.02, flow.frame(True, s6a_request(316, 0x301))),
+        (T0 + 0.03, flow.frame(False, s6a_answer(316, 0x301))),
+        (
+            T0 + 0.04,
+            gtpv2_frame(True, gtpv2(32, 7, [ie_imsi("001010000000001"), ie_apn("internet")])),
+        ),
+        (T0 + 0.05, gtpv2_frame(False, gtpv2(33, 7, [ie_cause(16)], teid=0x1234))),
+    ]
+    return write_pcap(tmp_path / "healthy.pcap", frames)
+
+
+@pytest.fixture
+def csr_unknown_apn(tmp_path: Path) -> Path:
+    frames = [
+        (T0, gtpv2_frame(True, gtpv2(32, 9, [ie_imsi("001010000000001"), ie_apn("wrong.apn")]))),
+        (T0 + 0.02, gtpv2_frame(False, gtpv2(33, 9, [ie_cause(78)], teid=0x1234))),
+    ]
+    return write_pcap(tmp_path / "csr-78.pcap", frames)
