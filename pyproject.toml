@@ -1,0 +1,25 @@
+[project]
+name = "capsight"
+version = "0.0.1"
+description = "Drop in a 4G/5G packet capture, get a plain-English diagnosis of why the call flow failed."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+capsight = "capsight.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
