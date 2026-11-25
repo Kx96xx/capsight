@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0
+
+First release on PyPI. Usable on real captures.
+
+- `--imsi X`: one subscriber's attach, authentication, session and data steps in order, and
+  where it stopped.
+- Large captures: streaming analysis; a 1.1 GB capture runs in about 780 MB of memory.
+  Same findings as 0.1 on 476 real and 17 public captures.
+- `--summary`: top problems with counts, first/last time and subscribers affected, the most
+  affected subscribers, and problems over time.
+- `--redact` / `--redact-all`: mask IMSI, MSISDN, IP addresses, hosts/realms and the capture
+  file name in text and JSON output.
+- Hosted demo redesigned (finding cards, demo captures, redact switch, report downloads).
+
 ## 0.1.0
 
 First release.
