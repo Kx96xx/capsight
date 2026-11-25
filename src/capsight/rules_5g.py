@@ -5,7 +5,7 @@ from __future__ import annotations
 import ipaddress
 from collections.abc import Iterator
 
-from capsight.codes import lookup
+from capsight.codes import Code, lookup
 from capsight.codes_5g import (
     MM_AUTH_FAILURE,
     MM_AUTH_REJECT,
@@ -59,6 +59,17 @@ def _earlier(ctx: Context, before: Packet, ue: str | None, predicate) -> Packet 
     return found
 
 
+def ngap_cause(packet: Packet) -> tuple[str, Code | None]:
+    """NGAP cause as "group=name" (e.g. "nas=deregister"), plus its code entry."""
+    group_idx = (_ints(packet, "ngap.Cause") or [-1])[0]
+    cause_group = NGAP_CAUSE_GROUPS[group_idx] if 0 <= group_idx < len(NGAP_CAUSE_GROUPS) else None
+    value = (_ints(packet, f"ngap.{cause_group}") or [None])[0] if cause_group else None
+    if cause_group and value is not None:
+        code = lookup(NGAP_CAUSE.get(cause_group, {}), value)
+        return f"{cause_group}={code.name}", code
+    return "no cause decoded", None
+
+
 @rule("ngap.failure")
 def ngap_failures(ctx: Context) -> Iterator[Finding]:
     groups: dict[object, _Group] = {}
@@ -69,16 +80,7 @@ def ngap_failures(ctx: Context) -> Iterator[Finding]:
             continue
         proc = (_ints(packet, "ngap.procedureCode") or [-1])[0]
         name = NGAP_PROCEDURES.get(proc, f"NGAP procedure {proc}")
-        group_idx = (_ints(packet, "ngap.Cause") or [-1])[0]
-        cause_group = (
-            NGAP_CAUSE_GROUPS[group_idx] if 0 <= group_idx < len(NGAP_CAUSE_GROUPS) else None
-        )
-        value = (_ints(packet, f"ngap.{cause_group}") or [None])[0] if cause_group else None
-        if cause_group and value is not None:
-            code = lookup(NGAP_CAUSE.get(cause_group, {}), value)
-            cause_text = f"{cause_group}={code.name}"
-        else:
-            code, cause_text = None, "no cause decoded"
+        cause_text, code = ngap_cause(packet)
         key = (proc, cause_text)
         if key not in groups:
             groups[key] = _Group(

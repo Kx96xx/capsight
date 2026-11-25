@@ -44,6 +44,22 @@ Notes:
   With a real cipher the NAS payload is opaque and capsight falls back to NGAP/PFCP evidence.
 - The SUPI is shown only when the SUCI uses the null scheme. A concealed SUCI is never guessed.
 
+### Ciphered NAS (v0.3)
+
+The lab runs with null ciphering (NEA0), which tshark can read. Reading the same captures
+with that turned off makes every NAS message after security setup look exactly like a
+ciphered one (NEA1/2/3), so the expected answer is known.
+
+| Capture | NAS readable | NAS ciphered |
+|---|---|---|
+| `unsupported-dnn/fault.pcap` | PDU session refused by the AMF: DNN not supported or not subscribed | Registered, but no PDU session was set up (inferred from NGAP: Initial Context Setup, no PDU Session Resource Setup) |
+| 3 baselines, and the 2 recoveries that include registration | No failures (resync info on one) | Info only: NAS ciphered, 6 messages unread (plus the same resync info) |
+| the 3 recoveries without NAS (`missing-n6-nat`, `plmn-mismatch`, `tac-mismatch`) | No failures | No failures |
+| `authentication-key-mismatch`, `plmn-mismatch`, `tac-mismatch`, `missing-n6-nat` faults | Their failure | The same failure (it happens before ciphering, or outside NAS) |
+
+No false failures on the healthy captures in either mode. A registration rejected after
+security setup is covered by unit tests only: none of these captures has one.
+
 ## Operator failure patterns
 
 The tests in `tests/test_operator_patterns.py` reproduce failure shapes seen in a production

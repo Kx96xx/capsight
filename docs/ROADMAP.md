@@ -36,7 +36,7 @@ completion with no crash and no flood of false findings; timings recorded in VAL
 - [x] **Policy and charging (Gx / Gy)**: credit-control rejects (no credit, user unknown,
   rating failed) and policy rejects explained.
 - [x] **MAP (2G/3G)**: authentication, update location and SMS routing errors.
-- **Ciphered 5G NAS**: when NAS is encrypted, diagnose from NGAP and PFCP instead and say what
+- [x] **Ciphered 5G NAS**: when NAS is encrypted, diagnose from NGAP and PFCP instead and say what
   could not be seen.
 
 Exit test: the local real-world corpus has no unexplained failure types; every new rule has

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Ciphered 5G NAS: an INFO finding says how many NAS messages were encrypted and with
+  which algorithm; registration that never completed and registrations with no PDU session
+  are inferred from NGAP (Initial Context Setup, PDU Session Resource Setup, UE Context
+  Release) and labelled as inferences.
 - MAP (2G/3G over SS7/SIGTRAN): operation errors with their diagnostics (authentication,
   location update, SMS routing and delivery), TCAP aborts with the reason, TCAP rejects,
   unanswered operations (30 s MAP timer floor), and a warning when the capture holds answers
