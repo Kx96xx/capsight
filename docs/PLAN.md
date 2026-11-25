@@ -48,12 +48,18 @@ Rules:
 - [x] One-directional capture detection (missing answers reported as one warning)
 - [ ] MAP (2G/3G) support: SAI / UL / CL / SRI-SM errors
 
-## Phase 2: 5G SA (weekends 4-5)
+## Phase 2: 5G SA - done
 
-- [ ] NGAP + 5G NAS registration flow, 5GMM cause codes
-- [ ] PFCP session establishment failures (N4), cause values
-- [ ] HTTP/2 SBI: decode problem details (`application/problem+json`), map cause strings (e.g. USER_NOT_FOUND, SUBSCRIPTION_NOT_FOUND)
-- [ ] Note in docs: 5G NAS is often ciphered; diagnose from NGAP/SBI where NAS is opaque
+- [x] NGAP unsuccessful outcomes with cause group and value (e.g. NG Setup unknown-PLMN-or-SNPN)
+- [x] 5GMM rejects, 5G-AKA authentication failure (MAC vs sync, recovery, Authentication Reject)
+- [x] PDU session refused by the AMF (5GMM status / DL NAS transport cause, e.g. #91 DNN)
+- [x] 5GSM PDU Session Establishment Reject with DNN
+- [x] PFCP request/response pairing, cause rejects, unanswered requests, retransmissions
+- [x] GTP-U one-way user plane with N6 NAT hint
+- [x] SUPI from a null-scheme SUCI, linked by RAN-UE-NGAP-ID; concealed SUCI never guessed
+- [x] Null-cipher NAS decode when tshark supports it; unknown tshark fields skipped per version
+- [x] Validated on 12 public Open5GS/UERANSIM captures, 12/12 (docs/VALIDATION.md)
+- [ ] HTTP/2 SBI problem details (needs a public capture with cleartext SBI to validate)
 
 ## Phase 3: interfaces (weekend 6)
 

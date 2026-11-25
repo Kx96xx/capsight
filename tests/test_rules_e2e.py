@@ -42,7 +42,7 @@ def test_csr_unknown_apn(csr_unknown_apn):
 
 def test_healthy_attach_has_no_findings(healthy_attach):
     report = analyze(healthy_attach)
-    assert report.transactions == {"diameter": 2, "gtpv2": 1}
+    assert report.transactions == {"diameter": 2, "gtpv2": 1, "pfcp": 0}
     assert report.findings == []
 
 

@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from capsight.codes import DIAMETER_COMMANDS, GTPV2_MESSAGES, GTPV2_PAIRS
+from capsight.codes_5g import PFCP_MESSAGES, PFCP_PAIRS
 from capsight.model import Packet
 
 
@@ -147,6 +148,41 @@ def correlate_gtpv2(packets: Iterable[Packet]) -> list[Transaction]:
                 tx = Transaction("gtpv2", GTPV2_MESSAGES.get(req_type, str(req_type)), None)
             tx.answer = packet
             answered[key] = tx
+            done.append(tx)
+    done.extend(open_requests.values())
+    return sorted(done, key=lambda t: t.first_packet.number)
+
+
+def correlate_pfcp(packets: Iterable[Packet]) -> list[Transaction]:
+    """Pair PFCP requests and responses by sequence number and message type.
+
+    Retransmissions (same sequence number while still open) are counted, not duplicated.
+    """
+    responses = {v: k for k, v in PFCP_PAIRS.items()}
+    open_requests: dict[tuple[int, int], Transaction] = {}
+    done: list[Transaction] = []
+    for packet in packets:
+        if not packet.has("pfcp"):
+            continue
+        mtype = to_int(packet.first("pfcp.msg_type"))
+        seq = to_int(packet.first("pfcp.seqno"))
+        if mtype is None or seq is None:
+            continue
+        if mtype in PFCP_PAIRS:
+            key = (seq, PFCP_PAIRS[mtype])
+            if key in open_requests:
+                open_requests[key].retransmissions += 1
+                continue
+            name = PFCP_MESSAGES.get(mtype, f"type {mtype}").removesuffix(" Request")
+            open_requests[key] = Transaction("pfcp", name, packet)
+        elif mtype in responses:
+            tx = open_requests.pop((seq, mtype), None)
+            if tx is None:
+                req = responses[mtype]
+                tx = Transaction(
+                    "pfcp", PFCP_MESSAGES.get(req, str(req)).removesuffix(" Request"), None
+                )
+            tx.answer = packet
             done.append(tx)
     done.extend(open_requests.values())
     return sorted(done, key=lambda t: t.first_packet.number)

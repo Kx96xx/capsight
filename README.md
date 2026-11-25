@@ -2,7 +2,7 @@
 
 **Drop in a 4G/5G packet capture, get a plain-English diagnosis of why the call flow failed.**
 
-> Status: early development. 4G core (Diameter S6a, GTPv2-C, NAS, RADIUS) works today. 5G is next. See [docs/PLAN.md](docs/PLAN.md).
+> Status: early development. 4G core (Diameter S6a, GTPv2-C, EPS NAS, RADIUS) and 5G SA (NGAP, 5G NAS, PFCP, GTP-U) work today. See [docs/PLAN.md](docs/PLAN.md).
 
 Debugging a mobile core usually means scrolling through thousands of Diameter, GTP and NAS packets in Wireshark and looking up result codes and cause values by hand. capsight does that part: it pairs requests with answers, matches known failure patterns and tells you what broke, for whom, where in the capture, and what to check next.
 
@@ -60,9 +60,12 @@ capsight reads `.pcap` / `.pcapng` files. Capture on the interface that carries 
 
 | Problem | Capture where | Filter example |
 |---|---|---|
-| Device won't attach | MME (S1-MME + S6a) | `sctp or port 3868` |
-| Attached but no data | MME/SGW/PGW GTP-C | `udp port 2123` |
-| Session rejected by AAA | PGW + RADIUS | `udp port 2123 or udp port 1812 or udp port 1813` |
+| 4G: device won't attach | MME (S1-MME + S6a) | `sctp or port 3868` |
+| 4G: attached but no data | MME/SGW/PGW GTP-C | `udp port 2123` |
+| 4G: session rejected by AAA | PGW + RADIUS | `udp port 2123 or udp port 1812 or udp port 1813` |
+| 5G: gNB or phone won't register | AMF (N2) | `sctp port 38412` |
+| 5G: registered but no PDU session | AMF + SMF/UPF (N2, N4) | `sctp port 38412 or udp port 8805` |
+| 5G: session up but no internet | UPF (N3 + N6) | `udp port 2152 or icmp` |
 
 ```bash
 tshark -i any -f "sctp or port 3868 or udp port 2123" -w attach.pcapng
@@ -128,12 +131,22 @@ capsight analyze attach.pcapng --format json | jq '.findings[] | {severity, verd
 - Authentication failure: MAC failure (SIM and HSS keys differ) vs sync failure (and whether it recovered)
 - PDN Connectivity Reject, and whether it happened during attach (failure) or for an extra APN after a working attach (warning)
 
-Checked against real public captures: [docs/VALIDATION.md](docs/VALIDATION.md).
+**5G SA**
+- NGAP failures with the cause, e.g. NG Setup rejected for an unknown PLMN or tracking area
+- Registration / Service / Security Mode Reject with 5GMM cause (no slices available, PLMN not allowed, ...)
+- 5G-AKA authentication failure: MAC failure (keys mismatch) vs sync failure, and whether the network then rejected
+- PDU session request refused by the AMF (e.g. 5GMM #91, DNN not subscribed), naming the DNN
+- PDU Session Establishment Reject from the SMF with 5GSM cause and DNN
+- PFCP rejects between SMF and UPF (rule creation failure, no association, no resources, ...) and unanswered PFCP requests
+- One-way user plane: uplink enters the GTP-U tunnel and nothing comes back, with a NAT hint when a private UE address leaks onto N6
+- SUPI shown when the SUCI is not concealed; never guessed when it is
+
+Checked against real public captures, 4G and 5G: [docs/VALIDATION.md](docs/VALIDATION.md).
 
 ## How it works
 
 1. **Decode**: `tshark` turns the capture into structured fields. capsight never writes its own dissectors.
-2. **Correlate**: requests are paired with answers (Diameter hop-by-hop + end-to-end ID, GTPv2 sequence number), and NAS messages are linked to a subscriber through the S1AP UE ID.
+2. **Correlate**: requests are paired with answers (Diameter hop-by-hop + end-to-end ID, GTPv2 and PFCP sequence numbers), and NAS messages are linked to a subscriber through the S1AP / NGAP UE ID.
 3. **Diagnose**: deterministic rules match known failure patterns. Every verdict cites packet numbers. Nothing is guessed.
 
 ## Privacy
@@ -148,8 +161,10 @@ Captures contain subscriber identities. capsight runs entirely on your machine, 
 | GTPv2-C | S11 / S5 / S8 | done |
 | NAS EMM/ESM | UE - MME | done |
 | RADIUS | PGW - AAA | done (correlation with GTP rejects) |
-| PFCP | N4 | next |
-| NGAP / 5G NAS | N2 / N1 | next |
+| PFCP | N4 | done |
+| NGAP / 5G NAS | N2 / N1 | done |
+| GTP-U | N3 / N6 | done (one-way user plane) |
+| MAP | 2G/3G HLR | next |
 | HTTP/2 SBI | 5GC NFs | planned |
 | SIP / Diameter Cx, Rx | IMS / VoLTE | planned |
 
