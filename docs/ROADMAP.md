@@ -35,7 +35,7 @@ completion with no crash and no flood of false findings; timings recorded in VAL
   hostname or realm.
 - [x] **Policy and charging (Gx / Gy)**: credit-control rejects (no credit, user unknown,
   rating failed) and policy rejects explained.
-- **MAP (2G/3G)**: authentication, update location and SMS routing errors.
+- [x] **MAP (2G/3G)**: authentication, update location and SMS routing errors.
 - **Ciphered 5G NAS**: when NAS is encrypted, diagnose from NGAP and PFCP instead and say what
   could not be seen.
 

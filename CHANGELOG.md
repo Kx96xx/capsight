@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- MAP (2G/3G over SS7/SIGTRAN): operation errors with their diagnostics (authentication,
+  location update, SMS routing and delivery), TCAP aborts with the reason, TCAP rejects,
+  unanswered operations (30 s MAP timer floor), and a warning when the capture holds answers
+  without their requests. SCTP-bundled TCAP messages are split exactly or left alone.
 - Fix: a capture record without a timestamp (tshark opens some non-capture files, e.g. MP4,
   that way) no longer crashes the analysis.
 - Roaming: S8 Create Session rejects and timeouts from a visited SGW, with the visited

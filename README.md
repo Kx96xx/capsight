@@ -207,6 +207,15 @@ capsight analyze attach.pcapng --format json | jq '.findings[] | {severity, verd
 - Roaming is only claimed when the capture proves it: the request came from an SGW and its Serving Network is not the subscriber's home network. Never guessed from host names, realms or IPs
 - S6a rejects (e.g. roaming not allowed) show the visited network from the Visited-PLMN-Id field
 
+**MAP (2G/3G over SS7 / SIGTRAN)**
+- Authentication, location update and SMS errors, named by operation with what to check: e.g. `SendAuthenticationInfo rejected: unknown subscriber (diagnostic: IMSI unknown)`, `UpdateLocation rejected: roaming not allowed (cause: PLMN roaming not allowed)`, `MO-ForwardSM rejected: SMS delivery failure (cause: unknown service centre)`
+- Error details the HLR/MSC sends: unknown-subscriber diagnostic, roaming-not-allowed cause, absent-subscriber diagnostic, SMS delivery failure cause, the node behind a system failure
+- Subscriber state (absent for SMS, busy) reported as a warning, not a network failure
+- TCAP dialogue aborts with the reason: provider abort (e.g. unrecognized transaction ID, a sign of asymmetric routing), MAP user abort, dialogue refused because the peer does not support the MAP version
+- TCAP rejects (mistyped parameter, unrecognized operation, ...) and operations never answered within the MAP timer
+- Captures that hold only part of the traffic (answers whose requests are not in the capture) get one warning, so timeouts are not over-read
+- Handles SCTP bundling (several TCAP messages per packet) and the same message seen on both legs of an STP
+
 **NAS (EPS)**
 - Attach / TAU / Service Reject with EMM cause, linked to the subscriber even when the reject carries no IMSI
 - Authentication failure: MAC failure (SIM and HSS keys differ) vs sync failure (and whether it recovered)
@@ -227,7 +236,7 @@ Checked against real public captures, 4G and 5G: [docs/VALIDATION.md](https://gi
 ## How it works
 
 1. **Decode**: `tshark` turns the capture into structured fields. capsight never writes its own dissectors.
-2. **Correlate**: requests are paired with answers (Diameter hop-by-hop + end-to-end ID, GTPv2 and PFCP sequence numbers), and NAS messages are linked to a subscriber through the S1AP / NGAP UE ID.
+2. **Correlate**: requests are paired with answers (Diameter hop-by-hop + end-to-end ID, GTPv2 and PFCP sequence numbers, MAP invoke ID within the TCAP dialogue), and NAS messages are linked to a subscriber through the S1AP / NGAP UE ID.
 3. **Diagnose**: deterministic rules match known failure patterns. Every verdict cites packet numbers. Nothing is guessed.
 
 ## Privacy
