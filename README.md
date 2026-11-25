@@ -160,20 +160,7 @@ Captures contain subscriber identities. capsight runs entirely on your machine, 
 
 ## Roadmap
 
-| Protocol | Interface | Status |
-|---|---|---|
-| Diameter S6a | MME - HSS | done |
-| GTPv2-C | S11 / S5 / S8 | done |
-| NAS EMM/ESM | UE - MME | done |
-| RADIUS | PGW - AAA | done (correlation with GTP rejects) |
-| PFCP | N4 | done |
-| NGAP / 5G NAS | N2 / N1 | done |
-| GTP-U | N3 / N6 | done (one-way user plane) |
-| MAP | 2G/3G HLR | next |
-| HTTP/2 SBI | 5GC NFs | planned |
-| SIP / Diameter Cx, Rx | IMS / VoLTE | planned |
-
-Also planned: `--redact` (mask IMSI/MSISDN/IP in reports), a web page to drop a capture in, and an MCP server so AI agents can call capsight as a tool.
+v0.2 real-capture usability, v0.3 operator coverage (roaming, Gx/Gy, MAP), v0.4 voice and SMS, v0.5 diagrams/HTML/MCP, v1.0 stable. Details and exit tests: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Contributing
 
