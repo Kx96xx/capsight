@@ -1,0 +1,35 @@
+name: release
+
+# Publishes to PyPI when a GitHub Release is published.
+# Uses PyPI trusted publishing (no API token stored in the repo). One-time setup on PyPI:
+# Account -> Publishing -> Add a pending publisher:
+#   project: capsight, owner: Kx96xx, repo: capsight, workflow: release.yml, environment: pypi
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

@@ -204,7 +204,9 @@ def test_missing_nat_on_n6(tmp_path):
     for i in range(3):
         frames.append((T0 + i, gtpu_frame(True, icmp_echo(UE_IP, DN_IP))))
         frames.append((T0 + i + 0.001, plain_ip_frame(icmp_echo(UE_IP, DN_IP))))
-    [finding] = analyze(write_pcap(tmp_path / "n6.pcap", frames)).findings
+    report = analyze(write_pcap(tmp_path / "n6.pcap", frames))
+    assert report.core_protocols == {"gtp": 3}
+    [finding] = report.findings
     assert finding.severity == Severity.FAILURE
     assert "one-way" in finding.verdict
     assert "NAT/masquerade" in finding.fix

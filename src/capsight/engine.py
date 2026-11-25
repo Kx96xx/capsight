@@ -43,7 +43,10 @@ class Report:
 def analyze_packets(capture: str, packets: list[Packet], answer_timeout: float = 5.0) -> Report:
     counts: Counter[str] = Counter()
     for packet in packets:
-        for proto in set(packet.protocols) & set(CORE_PROTOCOLS):
+        protos = set(packet.protocols) & set(CORE_PROTOCOLS)
+        if "gtpv2" in protos:
+            protos.discard("gtp")  # tshark lists GTPv2-C under gtp too; count it once
+        for proto in protos:
             counts[proto] += 1
     diameter = correlate_diameter(packets)
     gtpv2 = correlate_gtpv2(packets)

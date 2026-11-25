@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="827" height="554" viewBox="0 0 827 554">
+<rect width="827" height="554" rx="8" fill="#1a1b26"/>
+<circle cx="18" cy="16" r="5" fill="#ff5f56"/>
+<circle cx="34" cy="16" r="5" fill="#ffbd2e"/>
+<circle cx="50" cy="16" r="5" fill="#27c93f"/>
+<g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13">
+<text x="20" y="44" fill="#7aa2f7" xml:space="preserve">$ capsight analyze samples/synthetic/attach-user-unknown.pcap</text>
+<text x="20" y="62" fill="#e0e0e0" xml:space="preserve">capture   samples/synthetic/attach-user-unknown.pcap</text>
+<text x="20" y="80" fill="#e0e0e0" xml:space="preserve">packets   4  (0.11 s)</text>
+<text x="20" y="98" fill="#e0e0e0" xml:space="preserve">protocols diameter=4</text>
+<text x="20" y="116" fill="#e0e0e0" xml:space="preserve"></text>
+<text x="20" y="134" fill="#ff6b6b" xml:space="preserve">FAILURE   ULR rejected: DIAMETER_ERROR_USER_UNKNOWN.</text>
+<text x="20" y="152" fill="#a0a0a0" xml:space="preserve">WHY       ULA carried Experimental-Result-Code 5001 (DIAMETER_ERROR_USER_UNKNOWN).</text>
+<text x="20" y="170" fill="#a0a0a0" xml:space="preserve">WHO       001010000000001</text>
+<text x="20" y="188" fill="#a0a0a0" xml:space="preserve">WHERE     packets #3, #4</text>
+<text x="20" y="206" fill="#06d6a0" xml:space="preserve">FIX       The subscriber is not provisioned in the HSS/UDM, or the IMSI on the SIM does not</text>
+<text x="20" y="224" fill="#06d6a0" xml:space="preserve">          match the provisioned one.</text>
+<text x="20" y="242" fill="#e0e0e0" xml:space="preserve"></text>
+<text x="20" y="260" fill="#7aa2f7" xml:space="preserve">$ capsight analyze samples/synthetic/radius-accept-then-reject.pcap</text>
+<text x="20" y="278" fill="#e0e0e0" xml:space="preserve">capture   samples/synthetic/radius-accept-then-reject.pcap</text>
+<text x="20" y="296" fill="#e0e0e0" xml:space="preserve">packets   4  (0.03 s)</text>
+<text x="20" y="314" fill="#e0e0e0" xml:space="preserve">protocols gtpv2=2, radius=2</text>
+<text x="20" y="332" fill="#e0e0e0" xml:space="preserve"></text>
+<text x="20" y="350" fill="#ff6b6b" xml:space="preserve">FAILURE   Create Session Request rejected: User authentication failed.</text>
+<text x="20" y="368" fill="#a0a0a0" xml:space="preserve">WHY       Response carried cause 92 (User authentication failed) for APN internet. The</text>
+<text x="20" y="386" fill="#a0a0a0" xml:space="preserve">          responding node raised the cause itself. RADIUS returned Access-Accept (packet #3)</text>
+<text x="20" y="404" fill="#a0a0a0" xml:space="preserve">          just before, so the credentials were accepted.</text>
+<text x="20" y="422" fill="#a0a0a0" xml:space="preserve">WHO       001010000000003</text>
+<text x="20" y="440" fill="#a0a0a0" xml:space="preserve">WHERE     packets #1, #4</text>
+<text x="20" y="458" fill="#06d6a0" xml:space="preserve">FIX       Not a credential problem: RADIUS accepted the user but the gateway still refused the</text>
+<text x="20" y="476" fill="#06d6a0" xml:space="preserve">          session. Compare this Access-Accept with one from a working session on the same</text>
+<text x="20" y="494" fill="#06d6a0" xml:space="preserve">          gateway; look for a missing or different attribute (e.g. Framed-IP,</text>
+<text x="20" y="512" fill="#06d6a0" xml:space="preserve">          Called-Station-Id, a vendor-specific policy).</text>
+<text x="20" y="530" fill="#e0e0e0" xml:space="preserve"></text>
+</g>
+</svg>

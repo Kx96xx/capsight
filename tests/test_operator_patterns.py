@@ -42,6 +42,7 @@ def test_user_auth_failed_after_radius_accept(tmp_path):
         (T0 + 0.03, gtpv2_frame(False, csresp(1, 92))),
     ]
     report = analyze(write_pcap(tmp_path / "cs92.pcap", frames))
+    assert report.core_protocols == {"gtpv2": 2, "radius": 2}
     [finding] = report.findings
     assert "User authentication failed" in finding.verdict
     assert "Access-Accept (packet #3)" in finding.why
