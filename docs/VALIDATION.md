@@ -107,4 +107,26 @@ comes from dropping all but the IP addresses of non-core packets and sharing rep
 values (IMSIs, hosts, causes) across packets. Time is dominated by tshark's own decode
 (about 5 s of the 6.3 s for the 92 MB file).
 
-Still to do for v0.2: true streaming, so memory no longer grows with the capture.
+### Streaming
+
+capsight now analyzes packets as tshark emits them. Diameter, GTPv2-C and PFCP are paired
+on the fly and only the fields the rules read are kept; user plane is reduced to flow
+counters; only NAS / S1AP / NGAP / RADIUS packets are kept whole. Memory now grows with the
+number of signalling procedures, not with the number of packets.
+
+| File size | Peak memory before | Peak memory streaming | Time streaming |
+|---|---|---|---|
+| 92 MB | 419 MB | 216 MB | 5.6 s |
+| 159 MB | 589 MB | 255 MB | 8.7 s |
+| 398 MB | 1.3 GB | 431 MB | 26.2 s |
+| 474 MB | 1.5 GB | 411 MB | 30.8 s |
+| 543 MB | 1.7 GB | 491 MB | 36.3 s |
+| 610 MB | 1.9 GB | 508 MB | 34.3 s |
+| 1.1 GB | 3.3 GB | 844 MB | 76.1 s |
+
+Parity: 476 captures (17 public plus 459 local real-world captures, a few KB to 1.1 GB) were
+run through the previous version and the streaming version, comparing packet counts, protocol
+counts, transaction counts and every finding (rule, severity, verdict, count, evidence
+packets, subscribers). All 476 were identical. (5 more files in the set were macOS `._*`
+metadata files, not captures; both versions reject them with tshark's "isn't a capture file"
+error.)
