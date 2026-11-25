@@ -57,13 +57,41 @@ DIAMETER_RESULT: dict[int, Code] = {
     3003: Code("DIAMETER_REALM_NOT_SERVED", "The destination realm is not configured on the peer."),
     3004: Code("DIAMETER_TOO_BUSY", "The peer is overloaded. Check its load and retry policy."),
     3005: Code("DIAMETER_LOOP_DETECTED", "Routing loop between agents. Check Route-Record AVPs."),
+    3006: Code(
+        "DIAMETER_REDIRECT_INDICATION", "A redirect agent answered; the sender must re-route."
+    ),
+    3007: Code("DIAMETER_APPLICATION_UNSUPPORTED", "The peer does not support this application."),
+    3008: Code("DIAMETER_INVALID_HDR_BITS", "Invalid bits in the Diameter header."),
+    3009: Code("DIAMETER_INVALID_AVP_BITS", "An AVP has invalid flag bits."),
     3010: Code("DIAMETER_UNKNOWN_PEER", "The peer has no connection configured for the sender."),
+    4001: Code("DIAMETER_AUTHENTICATION_REJECTED", "Authentication of the user failed."),
+    4002: Code("DIAMETER_OUT_OF_SPACE", "The peer could not store the request (accounting)."),
+    4003: Code("ELECTION_LOST", "Connection election lost; the other peer's connection is kept."),
     4010: Code("DIAMETER_END_USER_SERVICE_DENIED", "Charging/policy denied service to the user."),
     4012: Code("DIAMETER_CREDIT_LIMIT_REACHED", "The user has no credit left."),
     5001: Code("DIAMETER_AVP_UNSUPPORTED", "A mandatory AVP is not understood by the peer."),
+    5002: Code("DIAMETER_UNKNOWN_SESSION_ID", "The peer has no session with this Session-Id."),
+    5003: Code("DIAMETER_AUTHORIZATION_REJECTED", "The user is not authorized for this request."),
     5004: Code("DIAMETER_INVALID_AVP_VALUE", "An AVP value was rejected. See the Failed-AVP."),
     5005: Code("DIAMETER_MISSING_AVP", "A required AVP is missing. See the Failed-AVP."),
+    5006: Code("DIAMETER_RESOURCES_EXCEEDED", "The peer refused: resource limits exceeded."),
+    5007: Code(
+        "DIAMETER_CONTRADICTING_AVPS", "Two AVPs contradict each other. See the Failed-AVP."
+    ),
+    5008: Code(
+        "DIAMETER_AVP_NOT_ALLOWED",
+        "The request carries an AVP the peer does not allow in this message. See the "
+        "Failed-AVP, and compare the sender's AVP set with what the peer's dictionary expects.",
+    ),
+    5009: Code("DIAMETER_AVP_OCCURS_TOO_MANY_TIMES", "An AVP is repeated too often."),
+    5010: Code("DIAMETER_NO_COMMON_APPLICATION", "The peers share no application (CER/CEA)."),
+    5011: Code("DIAMETER_UNSUPPORTED_VERSION", "Unsupported Diameter version."),
     5012: Code("DIAMETER_UNABLE_TO_COMPLY", "Generic failure on the peer. Check its logs."),
+    5013: Code("DIAMETER_INVALID_BIT_IN_HEADER", "Invalid bit in the Diameter header."),
+    5014: Code("DIAMETER_INVALID_AVP_LENGTH", "An AVP has an invalid length (encoding)."),
+    5015: Code("DIAMETER_INVALID_MESSAGE_LENGTH", "The message length is invalid (encoding)."),
+    5016: Code("DIAMETER_INVALID_AVP_BIT_COMBO", "An AVP has an invalid flag combination."),
+    5017: Code("DIAMETER_NO_COMMON_SECURITY", "The peers share no security mechanism."),
     5030: Code("DIAMETER_USER_UNKNOWN", "The charging/policy server does not know this user."),
 }
 

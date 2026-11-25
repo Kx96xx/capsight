@@ -88,3 +88,15 @@ def test_sync_failure_followed_by_success_is_info():
     [finding] = analyze_packets("x", packets).findings
     assert finding.severity == Severity.INFO
     assert "resync" in finding.verdict
+
+
+def test_every_rfc6733_base_failure_code_has_a_name():
+    from capsight.codes import DIAMETER_RESULT
+
+    missing = [
+        c
+        for c in [*range(3001, 3011), *range(4001, 4004), *range(5001, 5018)]
+        if c not in DIAMETER_RESULT
+    ]
+    assert missing == []
+    assert DIAMETER_RESULT[5008].name == "DIAMETER_AVP_NOT_ALLOWED"
