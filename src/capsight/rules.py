@@ -28,7 +28,33 @@ ESM_PDN_CONNECTIVITY_REJECT = 0xD1
 
 
 @dataclass
+class UserPlane:
+    """IP flow counts gathered while streaming, for user-plane rules."""
+
+    tunneled: dict[tuple[str, str], int] = field(default_factory=dict)
+    plain: dict[tuple[str, str], int] = field(default_factory=dict)
+    first_seen: dict[tuple[str, str], int] = field(default_factory=dict)
+
+    def feed(self, packet: Packet) -> None:
+        srcs = packet.fields.get("ip.src")
+        dsts = packet.fields.get("ip.dst")
+        if not srcs or not dsts:
+            return
+        if packet.has("gtp") and not packet.has("gtpv2"):
+            if len(srcs) >= 2 and len(dsts) >= 2:
+                flow = (srcs[-1], dsts[-1])
+                self.tunneled[flow] = self.tunneled.get(flow, 0) + 1
+                self.first_seen.setdefault(flow, packet.number)
+        elif not packet.has("gtp"):
+            flow = (srcs[0], dsts[0])
+            self.plain[flow] = self.plain.get(flow, 0) + 1
+
+
+@dataclass
 class Context:
+    """What rules see. `packets` holds only signalling packets (NAS, S1AP, NGAP, RADIUS);
+    Diameter, GTPv2-C and PFCP are in the transaction lists, user plane in `flows`."""
+
     packets: list[Packet]
     diameter: list[Transaction]
     gtpv2: list[Transaction]
@@ -36,6 +62,7 @@ class Context:
     answer_timeout: float = 5.0
     inferred_imsi: dict[int, str] = field(default_factory=dict)
     pfcp: list[Transaction] = field(default_factory=list)
+    flows: UserPlane = field(default_factory=UserPlane)
 
     def imsi_of(self, packet: Packet) -> str | None:
         return packet.first("e212.imsi") or self.inferred_imsi.get(packet.number)

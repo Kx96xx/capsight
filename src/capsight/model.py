@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Packet:
     """One decoded frame, reduced to the fields capsight cares about."""
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ipaddress
-from collections import Counter
 from collections.abc import Iterator
 
 from capsight.codes import lookup
@@ -279,25 +278,14 @@ def _private(addr: str) -> bool:
 @rule("gtpu.one_way")
 def gtpu_one_way(ctx: Context) -> Iterator[Finding]:
     """Uplink user traffic enters the tunnel but nothing ever comes back."""
-    tunneled: Counter[tuple[str, str]] = Counter()
-    first_seen: dict[tuple[str, str], int] = {}
-    plain: Counter[tuple[str, str]] = Counter()
-    for packet in ctx.packets:
-        srcs = packet.fields.get("ip.src", [])
-        dsts = packet.fields.get("ip.dst", [])
-        if not srcs or not dsts:
-            continue
-        if packet.has("gtp") and len(srcs) >= 2 and len(dsts) >= 2:
-            flow = (srcs[-1], dsts[-1])
-            tunneled[flow] += 1
-            first_seen.setdefault(flow, packet.number)
-        elif not packet.has("gtp"):
-            plain[(srcs[0], dsts[0])] += 1
+    tunneled = ctx.flows.tunneled
+    plain = ctx.flows.plain
+    first_seen = ctx.flows.first_seen
     groups: dict[object, _Group] = {}
     for (src, dst), n in tunneled.items():
-        if n < ONE_WAY_MIN_PACKETS or tunneled[(dst, src)] or plain[(dst, src)]:
+        if n < ONE_WAY_MIN_PACKETS or tunneled.get((dst, src)) or plain.get((dst, src)):
             continue
-        left_n6 = plain[(src, dst)]
+        left_n6 = plain.get((src, dst), 0)
         why = (
             f"{n} GTP-U packets from {src} to {dst} went into the tunnel and none came back "
             "(no reply inside or outside the tunnel)."
