@@ -4,20 +4,10 @@
 
 > Status: early development. 4G core (Diameter S6a, GTPv2-C, EPS NAS, RADIUS) and 5G SA (NGAP, 5G NAS, PFCP, GTP-U) work today. See [docs/PLAN.md](docs/PLAN.md).
 
+![capsight diagnosing two captures](docs/img/demo.svg)
+
 Debugging a mobile core usually means scrolling through thousands of Diameter, GTP and NAS packets in Wireshark and looking up result codes and cause values by hand. capsight does that part: it pairs requests with answers, matches known failure patterns and tells you what broke, for whom, where in the capture, and what to check next.
 
-```
-$ capsight analyze attach-failure.pcap
-capture   attach-failure.pcap
-packets   4  (0.11 s)
-protocols diameter=4
-
-FAILURE   ULR rejected: DIAMETER_ERROR_USER_UNKNOWN.
-WHY       ULA carried Experimental-Result-Code 5001 (DIAMETER_ERROR_USER_UNKNOWN).
-WHO       001010000000001
-WHERE     packets #3, #4
-FIX       The subscriber is not provisioned in the HSS/UDM, or the IMSI on the SIM does not match the provisioned one.
-```
 
 ## Who it is for
 
@@ -36,9 +26,12 @@ brew install wireshark          # macOS
 sudo apt install tshark         # Debian/Ubuntu
 
 # capsight
+pip install capsight             # from PyPI (after the first release)
+
+# or from source
 git clone https://github.com/Kx96xx/capsight.git
 cd capsight
-uv sync                          # or: pip install -e .
+uv sync
 ```
 
 ## Quick start
@@ -103,7 +96,19 @@ capsight analyze FILE [--format text|json] [--timeout SECONDS] [--fail-on failur
 
 Exit codes: `0` ok, `1` findings at the `--fail-on` level, `2` the capture could not be read.
 
-### 4. Use it in scripts / CI
+### 4. Web demo
+
+A small upload page, for people who would rather not use a terminal:
+
+```bash
+pip install "capsight[web]"
+capsight-web                     # http://127.0.0.1:7860
+```
+
+Uploads are analyzed in a temporary folder and deleted right after. `web/Dockerfile` builds
+the same page as a container (it is what the hosted demo runs).
+
+### 5. Use it in scripts / CI
 
 ```bash
 for f in captures/*.pcapng; do
