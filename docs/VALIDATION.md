@@ -83,3 +83,28 @@ Every capsight count was compared with an independent `tshark` display-filter co
 
 More public captures, especially: roaming rejects, GTPv2 rejections from a real gateway,
 Diameter timeouts, and 5G SA registration. Open an issue with a link.
+
+
+## Large captures (v0.2)
+
+Eight real-world Diameter/S6a captures, 92 MB to 1.1 GB, kept local and never committed.
+Apple M-series laptop, tshark 4.6, `capsight analyze --format json`. All eight completed with
+exit code 0; the largest produced 13 grouped findings (no flood of per-packet findings).
+
+| File size | Packets | Time | Peak memory | Findings |
+|---|---|---|---|---|
+| 92 MB | 201,101 | 6.3 s | 419 MB | 11 |
+| 109 MB | 107,861 | 4.1 s | 660 MB | 0 |
+| 159 MB | 303,026 | 9.6 s | 589 MB | 6 |
+| 398 MB | 802,326 | 27.2 s | 1.3 GB | 12 |
+| 474 MB | 1,184,913 | 32.2 s | 1.5 GB | 10 |
+| 543 MB | 875,453 | 38.8 s | 1.7 GB | 12 |
+| 610 MB | 1,213,392 | 37.7 s | 1.9 GB | 12 |
+| 1.1 GB | 2,398,305 | 83.2 s | 3.3 GB | 13 |
+
+Before this change the 92 MB and 159 MB files peaked at 606 MB and 857 MB (-31%). The saving
+comes from dropping all but the IP addresses of non-core packets and sharing repeated short
+values (IMSIs, hosts, causes) across packets. Time is dominated by tshark's own decode
+(about 5 s of the 6.3 s for the 92 MB file).
+
+Still to do for v0.2: true streaming, so memory no longer grows with the capture.

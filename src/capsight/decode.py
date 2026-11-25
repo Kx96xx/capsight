@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 from collections.abc import Iterator, Mapping, Sequence
 from functools import lru_cache
 from pathlib import Path
@@ -64,12 +65,38 @@ def build_command(
     return cmd
 
 
+# Fields kept for packets outside the core protocols: just enough for user-plane rules.
+NON_CORE_KEEP = ("ip.src", "ip.dst")
+CORE = frozenset(
+    ("diameter", "gtpv2", "gtp", "radius", "nas-eps", "s1ap", "ngap", "nas-5gs", "pfcp", "sip")
+)
+INTERN_MAX = 40  # values shorter than this repeat a lot (IMSIs, causes, hosts): share them
+
+_protocol_cache: dict[str, tuple[str, ...]] = {}
+
+
+def _protocols(value: str) -> tuple[str, ...]:
+    cached = _protocol_cache.get(value)
+    if cached is None:
+        cached = tuple(sys.intern(p) for p in value.split(":"))
+        _protocol_cache[value] = cached
+    return cached
+
+
+def _values(v: object) -> list[str]:
+    items = v if isinstance(v, list) else [v]
+    return [sys.intern(x) if isinstance(x, str) and len(x) < INTERN_MAX else x for x in items]
+
+
 def parse_ek_line(line: str, field_names: Sequence[str] = ()) -> Packet | None:
     """Parse one line of `tshark -T ek` output. Index lines return None.
 
     ek output replaces dots with underscores in field names, which is lossy for fields
     that contain a real underscore (e.g. ``nas_eps.emm.cause``). Passing the requested
     ``field_names`` restores the exact names.
+
+    Packets outside the core protocols keep only their IP addresses, and repeated short
+    values are interned, so large captures fit in memory.
     """
     line = line.strip()
     if not line:
@@ -78,15 +105,34 @@ def parse_ek_line(line: str, field_names: Sequence[str] = ()) -> Packet | None:
     layers = doc.get("layers")
     if layers is None:
         return None
-    names = {n.replace(".", "_"): n for n in (*BASE_FIELDS, *field_names)}
-    fields = {
-        names.get(k, k.replace("_", ".")): v if isinstance(v, list) else [v]
-        for k, v in layers.items()
-    }
-    number = int(fields.pop("frame.number")[0])
-    time = float(fields.pop("frame.time_epoch")[0])
-    protocols = tuple(fields.pop("frame.protocols", [""])[0].split(":"))
-    return Packet(number=number, time=time, protocols=protocols, fields=fields)
+    names = _name_map(tuple(field_names))
+    fields = {sys.intern(names.get(k, k.replace("_", "."))): v for k, v in layers.items()}
+    number = int(_first(fields.pop("frame.number")))
+    time = float(_first(fields.pop("frame.time_epoch")))
+    protocols = _protocols(_first(fields.pop("frame.protocols", "")))
+    if CORE.isdisjoint(protocols):
+        fields = {k: fields[k] for k in NON_CORE_KEEP if k in fields}
+    return Packet(
+        number=number,
+        time=time,
+        protocols=protocols,
+        fields={k: _values(v) for k, v in fields.items()},
+    )
+
+
+def _first(v: object) -> str:
+    return v[0] if isinstance(v, list) else v  # type: ignore[return-value]
+
+
+_name_maps: dict[tuple[str, ...], dict[str, str]] = {}
+
+
+def _name_map(field_names: tuple[str, ...]) -> dict[str, str]:
+    cached = _name_maps.get(field_names)
+    if cached is None:
+        cached = {n.replace(".", "_"): n for n in (*BASE_FIELDS, *field_names)}
+        _name_maps[field_names] = cached
+    return cached
 
 
 def read_packets(
