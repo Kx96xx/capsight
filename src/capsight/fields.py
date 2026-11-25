@@ -10,6 +10,17 @@ DIAMETER = (
     "diameter.User-Name",
     "diameter.Result-Code",
     "diameter.Experimental-Result-Code",
+    # Gx / Gy (policy and charging)
+    "diameter.Auth-Application-Id",
+    "diameter.CC-Request-Type",
+    "diameter.Subscription-Id-Type",
+    "diameter.Subscription-Id-Data",
+    "diameter.Called-Station-Id",
+    "diameter.Rating-Group",
+    "diameter.Final-Unit-Action",
+    "diameter.Charging-Rule-Name",
+    "diameter.PCC-Rule-Status",
+    "diameter.Rule-Failure-Code",
 )
 
 GTPV2 = (

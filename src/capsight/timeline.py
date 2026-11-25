@@ -19,7 +19,10 @@ from capsight.codes import (
 from capsight.codes_5g import MM_CAUSE, MM_MESSAGES, MM_REJECTS, SM_CAUSE, SM_REJECTS
 from capsight.correlate import Transaction, to_int
 from capsight.model import Finding, Packet
-from capsight.rules import Context
+from capsight.rules import Context, is_pcc
+from capsight.rules_pcc import _result as pcc_result
+from capsight.rules_pcc import interface as pcc_interface
+from capsight.rules_pcc import label as pcc_label
 
 OK, FAILED, NO_ANSWER, INFO = "ok", "failed", "no answer", "info"
 
@@ -65,6 +68,19 @@ class Step:
     detail: str = ""
 
 
+def _pcc_step(tx: Transaction, ctx: Context, packets: tuple[int, ...]) -> Step:
+    """Gx/Gy step, named by interface and request type (e.g. "Gy CCR-I")."""
+    first = tx.first_packet
+    name = pcc_label(tx)
+    if tx.answer is None:
+        return Step(first.time, packets, "diameter", name, _missing(ctx, first), "")
+    failed = pcc_result(tx.answer, pcc_interface(tx))
+    if failed is not None:
+        value, _kind, code = failed
+        return Step(first.time, packets, "diameter", name, FAILED, f"{code.name} ({value})")
+    return Step(first.time, packets, "diameter", name, OK, "")
+
+
 def normalize_imsi(value: str) -> str:
     """Accept 001010000000001, imsi-001010000000001 or 001 01 0000000001."""
     return re.sub(r"\D", "", value.removeprefix("imsi-"))
@@ -75,6 +91,8 @@ def _diameter_step(tx: Transaction, ctx: Context) -> Step:
     first = tx.first_packet
     answer_name = tx.name[:-1] + "A" if tx.name.endswith("R") else "answer"
     packets = tuple(p.number for p in (request, tx.answer) if p)
+    if is_pcc(tx):
+        return _pcc_step(tx, ctx, packets)
     if tx.answer is None:
         return Step(first.time, packets, "diameter", tx.name, _missing(ctx, first), "")
     exp = to_int(tx.answer.first("diameter.Experimental-Result-Code"))

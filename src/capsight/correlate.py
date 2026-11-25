@@ -49,6 +49,15 @@ TX_FIELDS = frozenset(
     (
         "diameter.Result-Code",
         "diameter.Experimental-Result-Code",
+        "diameter.applicationId",
+        "diameter.Auth-Application-Id",
+        "diameter.CC-Request-Type",
+        "diameter.Called-Station-Id",
+        "diameter.Rating-Group",
+        "diameter.Final-Unit-Action",
+        "diameter.Charging-Rule-Name",
+        "diameter.PCC-Rule-Status",
+        "diameter.Rule-Failure-Code",
         "gtpv2.cause",
         "gtpv2.cs",
         "gtpv2.apn",
@@ -66,6 +75,22 @@ def slim(packet: Packet, keep: frozenset[str] = TX_FIELDS) -> Packet:
         packet.protocols,
         {k: v for k, v in packet.fields.items() if k in keep},
     )
+
+
+SUBSCRIPTION_ID_IMSI = "1"  # Subscription-Id-Type END_USER_IMSI (RFC 4006)
+
+
+def diameter_imsi(packet: Packet) -> str | None:
+    """IMSI from User-Name (S6a) or from Subscription-Id of type END_USER_IMSI (Gx/Gy)."""
+    user = packet.first("diameter.User-Name")
+    if user:
+        return user
+    types = packet.fields.get("diameter.Subscription-Id-Type", [])
+    data = packet.fields.get("diameter.Subscription-Id-Data", [])
+    for kind, value in zip(types, data, strict=False):
+        if kind == SUBSCRIPTION_ID_IMSI and value.isdigit():
+            return value
+    return None
 
 
 def diameter_name(cmd: int, is_request: bool) -> str:
@@ -131,7 +156,7 @@ class DiameterCorrelator(Correlator):
                     "diameter",
                     diameter_name(cmd, True),
                     stored,
-                    imsi=packet.first("diameter.User-Name"),
+                    imsi=diameter_imsi(packet),
                 )
             else:
                 tx = self.open_requests.pop(key, None)
