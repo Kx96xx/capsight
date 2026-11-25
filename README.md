@@ -145,6 +145,20 @@ Time buckets grow with the capture (1 minute up to a day) so the chart stays und
 `--format json --summary` adds the same data under `summary`. Without `--summary`, capsight
 suggests it once a capture has 100+ problem occurrences.
 
+### Sharing output: --redact
+
+`--redact` masks what should not leave your network before you paste output into a ticket
+or chat. It works with every other option (`--summary`, `--imsi`, `--format json`):
+
+- subscriber numbers (IMSI, MSISDN) become `00101-sub1`, `00101-sub2`, ... The first 5
+  digits (the home network) are kept because they are often the diagnosis; `--redact-all`
+  hides them too
+- IP addresses become `ip1`, `ip2`, ...; host names and Diameter realms become `host1.invalid`
+- the capture's file name becomes `capture.pcap`
+
+The same value always gets the same placeholder within a run, so "these 40 failures are the
+same subscriber" still shows. The last line says how many values were masked.
+
 ### 4. Web demo
 
 A small upload page, for people who would rather not use a terminal:
@@ -206,7 +220,7 @@ Checked against real public captures, 4G and 5G: [docs/VALIDATION.md](docs/VALID
 
 ## Privacy
 
-Captures contain subscriber identities. capsight runs entirely on your machine, sends nothing anywhere, and stores nothing. Do not commit real captures: the repo's `.gitignore` blocks `*.pcap` / `*.pcapng` outside `samples/`.
+Captures contain subscriber identities. capsight runs entirely on your machine, sends nothing anywhere, and stores nothing. Do not commit real captures: the repo's `.gitignore` blocks `*.pcap` / `*.pcapng` outside `samples/`. Use `--redact` before sharing output.
 
 ## Roadmap
 

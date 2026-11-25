@@ -23,7 +23,7 @@ Exit test: `pip install capsight` works and the hosted web demo is live.
   publish timings for 100 MB / 1 GB files.
 - [x] **Summary mode** for busy captures: top failures, most affected subscribers, failures over
   time. Thousands of identical rejects become one line with a count.
-- **`--redact`**: mask IMSI, MSISDN, IP addresses and realms in all output formats.
+- [x] **`--redact`**: mask IMSI, MSISDN, IP addresses and realms in all output formats.
 
 Exit test: a corpus of large real-world captures (kept local, never committed) runs to
 completion with no crash and no flood of false findings; timings recorded in VALIDATION.md.
