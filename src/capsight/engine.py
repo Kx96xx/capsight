@@ -15,6 +15,13 @@ from capsight.decode import read_packets
 from capsight.identity import ngap_imsi_map, s1ap_imsi_map
 from capsight.model import Finding, Packet
 from capsight.rules import Context, run_rules
+from capsight.timeline import (
+    Step,
+    findings_for,
+    normalize_imsi,
+    subscriber_timeline,
+    subscribers_seen,
+)
 
 CORE_PROTOCOLS = (
     "diameter",
@@ -38,9 +45,17 @@ class Report:
     core_protocols: dict[str, int]
     transactions: dict[str, int]
     findings: list[Finding] = field(default_factory=list)
+    subscriber: str | None = None
+    timeline: list[Step] | None = None
+    subscribers_seen: list[str] | None = None
 
 
-def analyze_packets(capture: str, packets: list[Packet], answer_timeout: float = 5.0) -> Report:
+def analyze_packets(
+    capture: str,
+    packets: list[Packet],
+    answer_timeout: float = 5.0,
+    imsi: str | None = None,
+) -> Report:
     counts: Counter[str] = Counter()
     for packet in packets:
         protos = set(packet.protocols) & set(CORE_PROTOCOLS)
@@ -62,7 +77,7 @@ def analyze_packets(capture: str, packets: list[Packet], answer_timeout: float =
         inferred_imsi={**s1ap_imsi_map(packets), **ngap_imsi_map(packets)},
         pfcp=pfcp,
     )
-    return Report(
+    report = Report(
         capture=capture,
         packets=len(packets),
         duration_s=round(end - start, 3),
@@ -70,8 +85,17 @@ def analyze_packets(capture: str, packets: list[Packet], answer_timeout: float =
         transactions={"diameter": len(diameter), "gtpv2": len(gtpv2), "pfcp": len(pfcp)},
         findings=run_rules(ctx),
     )
+    if imsi is not None:
+        wanted = normalize_imsi(imsi)
+        steps = subscriber_timeline(ctx, wanted)
+        report.subscriber = wanted
+        report.timeline = steps
+        report.findings = findings_for(report.findings, wanted, steps)
+        if not steps:
+            report.subscribers_seen = subscribers_seen(ctx)
+    return report
 
 
-def analyze(capture: Path, answer_timeout: float = 5.0) -> Report:
+def analyze(capture: Path, answer_timeout: float = 5.0, imsi: str | None = None) -> Report:
     packets = list(read_packets(capture, fields.ALL, prefs=fields.PREFERENCES))
-    return analyze_packets(str(capture), packets, answer_timeout)
+    return analyze_packets(str(capture), packets, answer_timeout, imsi)

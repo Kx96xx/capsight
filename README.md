@@ -96,6 +96,25 @@ capsight analyze FILE [--format text|json] [--timeout SECONDS] [--fail-on failur
 
 Exit codes: `0` ok, `1` findings at the `--fail-on` level, `2` the capture could not be read.
 
+### Follow one subscriber
+
+When a capture has many devices, `--imsi` shows one subscriber's steps in order and where
+they stopped, plus only the findings about that subscriber:
+
+```
+$ capsight analyze attach.pcap --imsi 001010000000001
+
+subscriber 001010000000001
+  +   0.000s  #7          nas       Attach Request                               ok
+  +   0.001s  #8,#9       diameter  AIR -> AIA                                   FAILED  DIAMETER_ERROR_USER_UNKNOWN (5001)
+  +   0.004s  #10         nas       Attach Reject                                FAILED  EMM cause #8 (...)
+  stopped at: AIR -> AIA (packet #9), DIAMETER_ERROR_USER_UNKNOWN (5001)
+```
+
+If the IMSI is not in the capture, capsight lists the subscribers it did find. The IMSI can
+be written as `001010000000001` or `imsi-001010000000001`. In 5G the subscriber is known only
+when the SUCI is not concealed.
+
 ### 4. Web demo
 
 A small upload page, for people who would rather not use a terminal:
