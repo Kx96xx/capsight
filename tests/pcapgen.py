@@ -242,6 +242,35 @@ def ie_pdn_type(pdn_type: int) -> bytes:
     return _ie(99, bytes([pdn_type]))
 
 
+def plmn(mcc: str, mnc: str) -> bytes:
+    """3-octet PLMN identity (TS 24.008 10.5.1.13)."""
+    mnc3 = mnc[2] if len(mnc) == 3 else "F"
+    return bytes(
+        [
+            int(mcc[1]) << 4 | int(mcc[0]),
+            int(mnc3, 16) << 4 | int(mcc[2]),
+            int(mnc[1]) << 4 | int(mnc[0]),
+        ]
+    )
+
+
+def ie_serving_network(mcc: str, mnc: str) -> bytes:
+    return _ie(83, plmn(mcc, mnc))
+
+
+def ie_rat_type(rat: int = 6) -> bytes:  # 6 = EUTRAN
+    return _ie(82, bytes([rat]))
+
+
+# F-TEID interface types (TS 29.274 8.22)
+S8_SGW_GTPC = 6
+S11_MME_GTPC = 10
+
+
+def ie_fteid(interface: int, teid: int, ipv4: bytes = HOST_A, instance: int = 0) -> bytes:
+    return _ie(87, bytes([0x80 | interface]) + struct.pack("!I", teid) + ipv4, instance)
+
+
 def gtpv2(msg_type: int, seq: int, ies: list[bytes], teid: int = 0) -> bytes:
     body = b"".join(ies)
     length = 8 + len(body)  # TEID + seq + spare + IEs

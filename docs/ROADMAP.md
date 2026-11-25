@@ -30,8 +30,9 @@ completion with no crash and no flood of false findings; timings recorded in VAL
 
 ## v0.3: operator network coverage
 
-- **Roaming (S8)**: GTPv2-C rejects between visited and home network; the visited network is
-  named only from the Visited-PLMN-Id field, never guessed from a hostname or realm.
+- [x] **Roaming (S8)**: GTPv2-C rejects between visited and home network; the visited network is
+  named only from the Serving Network IE (S8) or Visited-PLMN-Id (S6a), never guessed from a
+  hostname or realm.
 - [x] **Policy and charging (Gx / Gy)**: credit-control rejects (no credit, user unknown,
   rating failed) and policy rejects explained.
 - **MAP (2G/3G)**: authentication, update location and SMS routing errors.

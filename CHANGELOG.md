@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Roaming: S8 Create Session rejects and timeouts from a visited SGW, with the visited
+  network (MCC/MNC from the Serving Network IE) and roaming-specific hints; S6a rejects
+  show the Visited-PLMN-Id.
 - Gx/Gy policy and charging: PCRF/OCS rejects by interface and request type, per-service
   (rating group) credit failures with Final-Unit-Action, policy rules the gateway could not
   install, and a failed CCR-I linked to the Create Session reject it caused.
