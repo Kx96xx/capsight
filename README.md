@@ -2,11 +2,11 @@
 
 **Drop in a 4G/5G packet capture, get a plain-English diagnosis of why a device couldn't attach, register or get data.**
 
-> Status: early development. 4G core (Diameter S6a, GTPv2-C, EPS NAS, RADIUS) and 5G SA (NGAP, 5G NAS, PFCP, GTP-U) work today. See [docs/PLAN.md](docs/PLAN.md).
+> Status: early development, v0.2. 4G core (Diameter S6a, GTPv2-C, EPS NAS, RADIUS) and 5G SA (NGAP, 5G NAS, PFCP, GTP-U) work today. See [docs/PLAN.md](https://github.com/Kx96xx/capsight/blob/main/docs/PLAN.md).
 
 **Try it in the browser:** [capsight-dewfuba7pvrbayxcmnamqb.streamlit.app](https://capsight-dewfuba7pvrbayxcmnamqb.streamlit.app/) (pick a demo capture or upload your own; the app sleeps when idle and takes ~30 s to wake).
 
-![capsight diagnosing two captures](docs/img/demo.svg)
+![capsight diagnosing two captures](https://raw.githubusercontent.com/Kx96xx/capsight/main/docs/img/demo.svg)
 
 Debugging a mobile core usually means scrolling through thousands of Diameter, GTP and NAS packets in Wireshark and looking up result codes and cause values by hand. capsight does that part: it pairs requests with answers, matches known failure patterns and tells you what broke, for whom, where in the capture, and what to check next.
 
@@ -210,7 +210,7 @@ capsight analyze attach.pcapng --format json | jq '.findings[] | {severity, verd
 - One-way user plane: uplink enters the GTP-U tunnel and nothing comes back, with a NAT hint when a private UE address leaks onto N6
 - SUPI shown when the SUCI is not concealed; never guessed when it is
 
-Checked against real public captures, 4G and 5G: [docs/VALIDATION.md](docs/VALIDATION.md).
+Checked against real public captures, 4G and 5G: [docs/VALIDATION.md](https://github.com/Kx96xx/capsight/blob/main/docs/VALIDATION.md).
 
 ## How it works
 
@@ -224,7 +224,7 @@ Captures contain subscriber identities. capsight runs entirely on your machine, 
 
 ## Roadmap
 
-v0.2 real-capture usability, v0.3 operator coverage (roaming, Gx/Gy, MAP), v0.4 voice and SMS, v0.5 diagrams/HTML/MCP, v1.0 stable. Details and exit tests: [docs/ROADMAP.md](docs/ROADMAP.md).
+v0.2 real-capture usability (released), v0.3 operator coverage (roaming, Gx/Gy, MAP), v0.4 voice and SMS, v0.5 diagrams/HTML/MCP, v1.0 stable. Details and exit tests: [docs/ROADMAP.md](https://github.com/Kx96xx/capsight/blob/main/docs/ROADMAP.md).
 
 ## Contributing
 
