@@ -19,7 +19,7 @@ Exit test: `pip install capsight` works and the hosted web demo is live.
 
 - [x] **Per-subscriber view**: `capsight analyze file --imsi X` prints that subscriber's attach,
   authentication, session and data steps in order and marks where it broke.
-- **Large captures**: stream packets instead of loading them all, pre-filter in tshark, and
+- [ ] **Large captures** (memory -31% and 1.1 GB timed, see VALIDATION.md; streaming next): stream packets instead of loading them all, pre-filter in tshark, and
   publish timings for 100 MB / 1 GB files.
 - **Summary mode** for busy captures: top failures, most affected subscribers, failures over
   time. Thousands of identical rejects become one line with a count.
