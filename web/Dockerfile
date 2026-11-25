@@ -13,6 +13,7 @@ COPY --chown=user . .
 RUN pip install --no-cache-dir ".[web]"
 
 USER user
-ENV GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860
+ENV GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT=7860 \
+    CAPSIGHT_SAMPLES=/home/user/app/samples/synthetic
 EXPOSE 7860
 CMD ["capsight-web"]
