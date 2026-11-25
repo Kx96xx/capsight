@@ -21,6 +21,8 @@ DIAMETER = (
     "diameter.Charging-Rule-Name",
     "diameter.PCC-Rule-Status",
     "diameter.Rule-Failure-Code",
+    # roaming
+    "diameter.Visited-PLMN-Id",
 )
 
 GTPV2 = (
@@ -31,6 +33,11 @@ GTPV2 = (
     "gtpv2.apn",
     "gtpv2.cs",
     "gtpv2.pdn_type",
+    # roaming (S8): where the device is and which interface the request came in on
+    "gtpv2.f_teid_interface_type",
+    "gtpv2.rat_type",
+    "e212.serv_net.mcc",
+    "e212.serv_net.mnc",
 )
 
 RADIUS = ("radius.code", "radius.id")

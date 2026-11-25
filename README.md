@@ -202,6 +202,11 @@ capsight analyze attach.pcapng --format json | jq '.findings[] | {severity, verd
 - Policy rules the gateway could not install (Charging-Rule-Report), with the rule name and reason
 - Says which server to fix: "user unknown" in the PCRF/OCS is a different job than in the HSS
 
+**Roaming**
+- Session requests from a visited network rejected or unanswered by the home network (S8), with the visited network as MCC/MNC and a roaming-specific reading of the cause
+- Roaming is only claimed when the capture proves it: the request came from an SGW and its Serving Network is not the subscriber's home network. Never guessed from host names, realms or IPs
+- S6a rejects (e.g. roaming not allowed) show the visited network from the Visited-PLMN-Id field
+
 **NAS (EPS)**
 - Attach / TAU / Service Reject with EMM cause, linked to the subscriber even when the reject carries no IMSI
 - Authentication failure: MAC failure (SIM and HSS keys differ) vs sync failure (and whether it recovered)

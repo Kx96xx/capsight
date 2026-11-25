@@ -22,6 +22,7 @@ from capsight.codes import (
 )
 from capsight.correlate import Transaction, to_bool, to_int
 from capsight.model import Finding, Packet, Severity
+from capsight.roaming import decode_plmn, is_visiting, plmn_text
 
 MAX_EVIDENCE = 5
 ESM_PDN_CONNECTIVITY_REJECT = 0xD1
@@ -167,6 +168,7 @@ def is_pcc(tx: Transaction) -> bool:
 @rule("diameter.result")
 def diameter_failures(ctx: Context) -> Iterator[Finding]:
     groups: dict[object, _Group] = {}
+    roaming: dict[object, set[tuple[str, str]]] = {}
     for tx in ctx.diameter:
         if tx.answer is None or is_pcc(tx):
             continue  # Gx/Gy answers are explained by rules_pcc
@@ -181,15 +183,26 @@ def diameter_failures(ctx: Context) -> Iterator[Finding]:
         else:
             continue
         answer_name = tx.name[:-1] + "A" if tx.name.endswith("R") else tx.name
+        visited = decode_plmn(tx.request.first("diameter.Visited-PLMN-Id") if tx.request else None)
         key = (tx.name, kind, value)
+        if is_visiting(tx.imsi, visited):
+            roaming.setdefault(key, set()).add(visited)
         if key not in groups:
+            why = f"{answer_name} carried {kind} {value} ({code.name})."
             groups[key] = _Group(
                 verdict=f"{tx.name} rejected: {code.name}.",
-                why=f"{answer_name} carried {kind} {value} ({code.name}).",
+                why=why,
                 fix=code.hint,
                 severity=Severity.FAILURE,
             )
         _add(groups[key], [p for p in (tx.request, tx.answer) if p], tx.imsi)
+    for key, plmns in roaming.items():
+        names = ", ".join(plmn_text(p) for p in sorted(plmns)[:5])
+        more = f" and {len(plmns) - 5} more" if len(plmns) > 5 else ""
+        groups[key].why += (
+            f" Roaming: the requests name visited network{'s' if len(plmns) > 1 else ''} "
+            f"{names}{more} (Visited-PLMN-Id)."
+        )
     yield from _emit("diameter.result", groups)
 
 
@@ -482,14 +495,18 @@ AUTH_RESPONSE = 0x53
 ATTACH_ACCEPT = 0x42
 
 # A more specific finding replaces a generic one that cites only the same packets.
-SUPERSEDES = {"gtpv2.pdn_type": "gtpv2.cause"}
+# A more specific rule replaces the generic finding for the same packets.
+SUPERSEDES: dict[str, tuple[str, ...]] = {
+    "gtpv2.pdn_type": ("gtpv2.cause", "roaming.s8"),
+    "roaming.s8": ("gtpv2.cause", "gtpv2.unanswered"),
+}
 
 
 def _drop_superseded(findings: list[Finding]) -> list[Finding]:
     covered: dict[str, set[int]] = {}
     for f in findings:
-        if f.rule_id in SUPERSEDES:
-            covered.setdefault(SUPERSEDES[f.rule_id], set()).update(f.evidence)
+        for target in SUPERSEDES.get(f.rule_id, ()):
+            covered.setdefault(target, set()).update(f.evidence)
     return [
         f for f in findings if not (f.rule_id in covered and set(f.evidence) <= covered[f.rule_id])
     ]
