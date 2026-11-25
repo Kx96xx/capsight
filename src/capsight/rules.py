@@ -125,24 +125,75 @@ def diameter_failures(ctx: Context) -> Iterator[Finding]:
     yield from _emit("diameter.result", groups)
 
 
-@rule("diameter.unanswered")
-def diameter_unanswered(ctx: Context) -> Iterator[Finding]:
+ONE_WAY_MIN_REQUESTS = 20
+ONE_WAY_MAX_ANSWER_RATIO = 0.05
+
+
+def _unanswered(
+    ctx: Context,
+    txs: list[Transaction],
+    rule_id: str,
+    fix: str,
+) -> Iterator[Finding]:
+    """Requests with no answer, unless the capture simply does not contain the answers.
+
+    If a command type has many requests and almost no answers at all, the capture is most
+    likely one-directional (filtered on one host, one side of a mirror port). Reporting
+    thousands of timeouts would be wrong, so that case becomes a single warning.
+    """
+    requests: dict[str, int] = {}
+    answers: dict[str, int] = {}
+    for tx in txs:
+        if tx.request is not None:
+            requests[tx.name] = requests.get(tx.name, 0) + 1
+            if tx.answer is not None:
+                answers[tx.name] = answers.get(tx.name, 0) + 1
+    one_way = {
+        name
+        for name, n in requests.items()
+        if n >= ONE_WAY_MIN_REQUESTS and answers.get(name, 0) / n <= ONE_WAY_MAX_ANSWER_RATIO
+    }
     groups: dict[object, _Group] = {}
-    for tx in ctx.diameter:
+    for tx in txs:
         if tx.answer is not None or tx.request is None:
             continue
         if ctx.capture_end - tx.request.time < ctx.answer_timeout:
             continue  # capture ended too soon to call it a timeout
+        if tx.name in one_way:
+            key = ("one_way", tx.name)
+            if key not in groups:
+                n, a = requests[tx.name], answers.get(tx.name, 0)
+                groups[key] = _Group(
+                    verdict=f"Capture looks one-directional for {tx.name}: answers are missing.",
+                    why=f"{n} {tx.name} requests but only {a} answers in the whole capture. "
+                    "That pattern means the answers were not captured (capture filtered on "
+                    "one host or one direction), not that the peer stopped answering.",
+                    fix="Capture both directions (both peers' addresses) before concluding "
+                    "requests timed out.",
+                    severity=Severity.WARNING,
+                )
+            _add(groups[key], [tx.request], tx.imsi)
+            continue
         if tx.name not in groups:
             groups[tx.name] = _Group(
                 verdict=f"{tx.name} never answered.",
                 why=f"No answer to {tx.name} within {ctx.answer_timeout:g} s.",
-                fix="The peer or a routing agent dropped the request. Check the Diameter "
-                "connection state and routing for the destination realm.",
+                fix=fix,
                 severity=Severity.FAILURE,
             )
         _add(groups[tx.name], [tx.request], tx.imsi)
-    yield from _emit("diameter.unanswered", groups)
+    yield from _emit(rule_id, groups)
+
+
+@rule("diameter.unanswered")
+def diameter_unanswered(ctx: Context) -> Iterator[Finding]:
+    yield from _unanswered(
+        ctx,
+        ctx.diameter,
+        "diameter.unanswered",
+        "The peer or a routing agent dropped the request. Check the Diameter connection "
+        "state and routing for the destination realm.",
+    )
 
 
 PDN_TYPES = {1: "IPv4", 2: "IPv6", 3: "IPv4v6", 4: "non-IP", 5: "Ethernet"}
@@ -259,22 +310,13 @@ def pdn_type_split(ctx: Context) -> Iterator[Finding]:
 
 @rule("gtpv2.unanswered")
 def gtpv2_unanswered(ctx: Context) -> Iterator[Finding]:
-    groups: dict[object, _Group] = {}
-    for tx in ctx.gtpv2:
-        if tx.answer is not None or tx.request is None:
-            continue
-        if ctx.capture_end - tx.request.time < ctx.answer_timeout:
-            continue
-        if tx.name not in groups:
-            groups[tx.name] = _Group(
-                verdict=f"{tx.name} never answered.",
-                why=f"No response within {ctx.answer_timeout:g} s.",
-                fix="The peer gateway is unreachable or dropping requests. Check the path "
-                "(GTP-C on UDP 2123) and the peer's health.",
-                severity=Severity.FAILURE,
-            )
-        _add(groups[tx.name], [tx.request], tx.imsi)
-    yield from _emit("gtpv2.unanswered", groups)
+    yield from _unanswered(
+        ctx,
+        ctx.gtpv2,
+        "gtpv2.unanswered",
+        "The peer gateway is unreachable or dropping requests. Check the path (GTP-C on "
+        "UDP 2123) and the peer's health.",
+    )
 
 
 @rule("nas.emm.reject")

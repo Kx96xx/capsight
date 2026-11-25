@@ -44,3 +44,19 @@ def test_healthy_attach_has_no_findings(healthy_attach):
     report = analyze(healthy_attach)
     assert report.transactions == {"diameter": 2, "gtpv2": 1}
     assert report.findings == []
+
+
+def test_one_directional_capture_is_a_warning_not_timeouts(tmp_path):
+    from conftest import T0
+    from pcapgen import HOST_A, HOST_B, TcpFlow, s6a_request, udp_frame, write_pcap
+
+    from capsight.model import Severity
+
+    flow = TcpFlow(HOST_A, HOST_B, 40005, 3868)
+    frames = [(T0 + i * 0.1, flow.frame(True, s6a_request(316, 0x500 + i))) for i in range(30)]
+    frames.append((T0 + 20, udp_frame(HOST_A, HOST_B, 40000, 9999, b"x")))
+    report = analyze(write_pcap(tmp_path / "oneway.pcap", frames))
+    [finding] = report.findings
+    assert finding.severity == Severity.WARNING
+    assert "one-directional" in finding.verdict
+    assert finding.count == 30
