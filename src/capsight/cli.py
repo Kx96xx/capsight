@@ -27,6 +27,10 @@ def render_text(report: Report) -> str:
             else "no mobile-core signalling found"
         )
     )
+    if report.subscriber is not None:
+        lines += render_timeline(report)
+        if not report.timeline:
+            return "\n".join(lines)
     problems = [f for f in report.findings if f.severity != "info"]
     if not problems:
         lines += ["", "No known failure patterns found."]
@@ -47,6 +51,41 @@ def render_text(report: Report) -> str:
     return "\n".join(lines)
 
 
+STATUS_MARK = {"ok": "ok", "failed": "FAILED", "no answer": "NO ANSWER", "info": "note"}
+
+
+def render_timeline(report: Report) -> list[str]:
+    lines = ["", f"subscriber {report.subscriber}"]
+    steps = report.timeline or []
+    if not steps:
+        lines.append("  not found in this capture.")
+        seen = report.subscribers_seen or []
+        if seen:
+            shown = ", ".join(seen[:10])
+            more = f" (+{len(seen) - 10} more)" if len(seen) > 10 else ""
+            lines.append(f"  subscribers in this capture: {shown}{more}")
+        else:
+            lines.append("  no subscriber identities were found in this capture.")
+        return lines
+    t0 = steps[0].time
+    for step in steps:
+        where = "#" + ",#".join(str(n) for n in step.packets)
+        mark = STATUS_MARK.get(step.status, step.status)
+        line = f"  +{step.time - t0:8.3f}s  {where:<11} {step.protocol:<9} {step.name:<44} {mark}"
+        if step.detail:
+            line += f"  {step.detail}"
+        lines.append(line.rstrip())
+    broken = next((s for s in steps if s.status in ("failed", "no answer")), None)
+    if broken is None:
+        lines.append("  every step above completed.")
+    else:
+        lines.append(
+            f"  stopped at: {broken.name} (packet #{broken.packets[-1]})"
+            + (f", {broken.detail}" if broken.detail else "")
+        )
+    return lines
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="capsight", description=__doc__)
     parser.add_argument("--version", action="version", version=f"capsight {__version__}")
@@ -61,6 +100,10 @@ def main(argv: list[str] | None = None) -> int:
         help="seconds without an answer before a request counts as unanswered (default 5)",
     )
     analyze_cmd.add_argument(
+        "--imsi",
+        help="show one subscriber's steps in order and only the findings about it",
+    )
+    analyze_cmd.add_argument(
         "--fail-on",
         choices=("failure", "warning", "never"),
         default="never",
@@ -69,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        report = analyze(args.capture, answer_timeout=args.timeout)
+        report = analyze(args.capture, answer_timeout=args.timeout, imsi=args.imsi)
     except TsharkError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
