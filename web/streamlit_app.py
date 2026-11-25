@@ -11,11 +11,16 @@ from __future__ import annotations
 
 import html
 import json
+import sys
 import tempfile
 from dataclasses import asdict
 from pathlib import Path
 
 import streamlit as st
+
+# Always use the capsight source next to this file, never a stale installed copy:
+# the hosting platform caches pip installs between deploys.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from capsight.cli import render_text
 from capsight.redact import Redactor
