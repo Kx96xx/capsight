@@ -1,6 +1,6 @@
 # capsight
 
-**Drop in a 4G/5G packet capture, get a plain-English diagnosis of why the call flow failed.**
+**Drop in a 4G/5G packet capture, get a plain-English diagnosis of why a device couldn't attach, register or get data.**
 
 > Status: early development. 4G core (Diameter S6a, GTPv2-C, EPS NAS, RADIUS) and 5G SA (NGAP, 5G NAS, PFCP, GTP-U) work today. See [docs/PLAN.md](docs/PLAN.md).
 
