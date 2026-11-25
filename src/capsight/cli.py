@@ -11,9 +11,12 @@ from pathlib import Path
 from capsight import __version__
 from capsight.decode import TsharkError
 from capsight.engine import Report, analyze
+from capsight.summary import build_summary, render_summary
+
+SUMMARY_HINT_OCCURRENCES = 100
 
 
-def render_text(report: Report) -> str:
+def render_text(report: Report, summary: dict | None = None) -> str:
     lines = [
         f"capture   {report.capture}",
         f"packets   {report.packets}  ({report.duration_s} s)",
@@ -31,6 +34,8 @@ def render_text(report: Report) -> str:
         lines += render_timeline(report)
         if not report.timeline:
             return "\n".join(lines)
+    if summary is not None:
+        return "\n".join(lines + render_summary(summary))
     problems = [f for f in report.findings if f.severity != "info"]
     if not problems:
         lines += ["", "No known failure patterns found."]
@@ -48,6 +53,8 @@ def render_text(report: Report) -> str:
         lines.append(f"{'WHERE':<9} packets " + ", ".join(f"#{n}" for n in finding.evidence))
         if finding.fix:
             lines.append(f"{'FIX':<9} {finding.fix}")
+    if sum(f.count for f in problems) >= SUMMARY_HINT_OCCURRENCES:
+        lines += ["", "tip: add --summary for top problems, most affected subscribers and timing."]
     return "\n".join(lines)
 
 
@@ -104,6 +111,11 @@ def main(argv: list[str] | None = None) -> int:
         help="show one subscriber's steps in order and only the findings about it",
     )
     analyze_cmd.add_argument(
+        "--summary",
+        action="store_true",
+        help="busy captures: top problems, most affected subscribers, problems over time",
+    )
+    analyze_cmd.add_argument(
         "--fail-on",
         choices=("failure", "warning", "never"),
         default="never",
@@ -116,7 +128,14 @@ def main(argv: list[str] | None = None) -> int:
     except TsharkError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    print(json.dumps(asdict(report), indent=2) if args.format == "json" else render_text(report))
+    summary = build_summary(report) if args.summary else None
+    if args.format == "json":
+        doc = asdict(report)
+        if summary is not None:
+            doc["summary"] = summary
+        print(json.dumps(doc, indent=2))
+    else:
+        print(render_text(report, summary))
     return 1 if _should_fail(report, args.fail_on) else 0
 
 
