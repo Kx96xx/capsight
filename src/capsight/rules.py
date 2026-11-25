@@ -54,7 +54,7 @@ class UserPlane:
 @dataclass
 class Context:
     """What rules see. `packets` holds only signalling packets (NAS, S1AP, NGAP, RADIUS);
-    Diameter, GTPv2-C and PFCP are in the transaction lists, user plane in `flows`."""
+    Diameter, GTPv2-C, PFCP and MAP are in the transaction lists, user plane in `flows`."""
 
     packets: list[Packet]
     diameter: list[Transaction]
@@ -64,6 +64,8 @@ class Context:
     inferred_imsi: dict[int, str] = field(default_factory=dict)
     pfcp: list[Transaction] = field(default_factory=list)
     flows: UserPlane = field(default_factory=UserPlane)
+    map: list[Transaction] = field(default_factory=list)
+    capture_start: float = 0.0
 
     def imsi_of(self, packet: Packet) -> str | None:
         return packet.first("e212.imsi") or self.inferred_imsi.get(packet.number)
@@ -232,6 +234,7 @@ def _unanswered(
     rule_id: str,
     fix: str,
     claimed: Callable[[Transaction], bool] = lambda tx: False,
+    timeout: float | None = None,
 ) -> Iterator[Finding]:
     """Requests with no answer, unless the capture simply does not contain the answers.
 
@@ -247,11 +250,12 @@ def _unanswered(
             if tx.answer is not None:
                 answers[tx.name] = answers.get(tx.name, 0) + 1
     one_way = one_way_commands(txs)
+    wait = ctx.answer_timeout if timeout is None else timeout
     groups: dict[object, _Group] = {}
     for tx in txs:
         if tx.answer is not None or tx.request is None:
             continue
-        if ctx.capture_end - tx.request.time < ctx.answer_timeout:
+        if ctx.capture_end - tx.request.time < wait:
             continue  # capture ended too soon to call it a timeout
         if tx.name in one_way:
             key = ("one_way", tx.name)
@@ -273,7 +277,7 @@ def _unanswered(
         if tx.name not in groups:
             groups[tx.name] = _Group(
                 verdict=f"{tx.name} never answered.",
-                why=f"No answer to {tx.name} within {ctx.answer_timeout:g} s.",
+                why=f"No answer to {tx.name} within {wait:g} s.",
                 fix=fix,
                 severity=Severity.FAILURE,
             )

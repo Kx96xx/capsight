@@ -76,8 +76,29 @@ Every capsight count was compared with an independent `tshark` display-filter co
 - **Bug found and fixed**: captures filtered on one host (requests captured, answers not)
   produced tens of thousands of false "never answered" failures. capsight now detects a
   one-directional capture and reports one warning instead.
-- **Not yet covered**: these captures had no S1AP/NAS (no EMM/ESM rejects to check) and
-  include MAP (2G/3G) signalling, which capsight does not analyse yet.
+- **Not yet covered**: these captures had no S1AP/NAS (no EMM/ESM rejects to check). MAP
+  (2G/3G) was not analysed at the time; see the MAP section below (v0.3).
+
+## MAP on production STP captures (v0.3, local only)
+
+Two consecutive 5-minute captures from a production STP pair (334k packets, 72k MAP frames,
+both directions of the visited-network and HLR legs), kept local and never committed.
+
+- **Bundled TCAP messages**: 6% of frames carry several TCAP messages (SCTP bundling), and
+  tshark lists their fields side by side. capsight rebuilds each message from the order of
+  transaction IDs, component counts and component kinds. Checked against tshark's nested
+  JSON for every one of the 4,440 multi-message frames: 4,330 split, **0 wrong**; the other
+  110 have two valid readings (a BEGIN plus an END looks like one CONTINUE) and are left
+  unsplit on purpose, without producing false timeouts.
+- **Found**: SendAuthenticationInfo rejected with unknown subscriber (with the diagnostic),
+  operations never answered (in a quarter of them the requester asked again in the same
+  dialogue, so the timeouts are real), dialogue aborts (provider abort with unrecognized
+  transaction ID, MAP user aborts, procedure cancelled), and about 4,000 answers whose
+  request is not in the capture: reported as one warning that the capture holds only part
+  of the traffic.
+- **Bug found and fixed during development**: skipping bundled frames instead of splitting
+  them turned ~1,800 answers into "answer without request".
+- 78 MB / 167k packets in 5.4 s and 254 MB of memory.
 
 ## Wanted
 

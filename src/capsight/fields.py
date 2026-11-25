@@ -77,6 +77,43 @@ NAS_5GS = (
 
 PFCP = ("pfcp.msg_type", "pfcp.seqno", "pfcp.cause", "pfcp.seid")
 
+# MAP over TCAP (2G/3G core over SS7/SIGTRAN). Element fields mark which TCAP message and
+# which component a value belongs to; see correlate_map.py.
+MAP = (
+    "tcap.begin_element",
+    "tcap.continue_element",
+    "tcap.end_element",
+    "tcap.abort_element",
+    "tcap.tid",
+    "tcap.otid",
+    "tcap.dtid",
+    "tcap.components",
+    "tcap.p_abortCause",
+    "tcap.result",
+    "tcap.dialogue_service_user",
+    "gsm_map.old.Component",
+    "gsm_old.invokeID",
+    "gsm_old.derivable",
+    "gsm_old.localValue",
+    "gsm_old.generalProblem",
+    "gsm_old.invokeProblem",
+    "gsm_old.returnResultProblem",
+    "gsm_old.returnErrorProblem",
+    "gsm_map.er.unknownSubscriberDiagnostic",
+    "gsm_map.er.roamingNotAllowedCause",
+    "gsm_map.er.additionalRoamingNotAllowedCause",
+    "gsm_map.er.absentSubscriberDiagnosticSM",
+    "gsm_map.er.absentSubscriberReason",
+    "gsm_map.er.sm_EnumeratedDeliveryFailureCause",
+    "gsm_map.er.callBarringCause",
+    "gsm_map.er.networkResource",
+    "gsm_map.dialogue.userSpecificReason_element",
+    "gsm_map.dialogue.userResourceLimitation_element",
+    "gsm_map.dialogue.resourceUnavailable",
+    "gsm_map.dialogue.applicationProcedureCancellation",
+    "gsm_map.dialogue.map_ProviderAbortReason",
+)
+
 USER_PLANE = ("ip.src", "ip.dst", "gtp.teid")
 
 ALL = (
@@ -88,6 +125,7 @@ ALL = (
     *NGAP,
     *NAS_5GS,
     *PFCP,
+    *MAP,
     *USER_PLANE,
 )
 

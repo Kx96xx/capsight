@@ -350,3 +350,179 @@ def gtpu_frame(uplink: bool, inner: bytes, teid: int = 0xA002) -> bytes:
 
 def plain_ip_frame(inner: bytes) -> bytes:
     return _eth(inner)
+
+
+# ---- SS7 over SIGTRAN: SCTP / M3UA / SCCP / TCAP / MAP ----------------------------------
+
+STP_A = bytes([192, 0, 2, 50])  # e.g. visited network STP / VLR side
+STP_B = bytes([192, 0, 2, 60])  # e.g. home network STP / HLR side
+SSN_HLR, SSN_VLR, SSN_MSC, SSN_SGSN = 6, 7, 8, 149
+
+
+def ber(tag: int, value: bytes) -> bytes:
+    n = len(value)
+    if n < 0x80:
+        length = bytes([n])
+    else:
+        raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
+        length = bytes([0x80 | len(raw)]) + raw
+    return bytes([tag]) + length + value
+
+
+def ber_int(tag: int, value: int) -> bytes:
+    return ber(tag, value.to_bytes(max(1, (value.bit_length() + 8) // 8), "big", signed=True))
+
+
+# MAP application contexts 0.4.0.0.1.0.<ac>.<version> (TS 29.002 17.3.3)
+AC_NETWORK_LOC_UP, AC_INFO_RETRIEVAL, AC_GPRS_LOC_UP = 1, 14, 32
+AC_SM_GATEWAY, AC_SM_MO_RELAY, AC_SM_MT_RELAY = 20, 21, 25
+DIALOGUE_AS = bytes.fromhex("00118605010101")  # 0.0.17.773.1.1.1
+MAP_DIALOGUE_AS = bytes.fromhex("04000001010101")  # 0.4.0.0.1.1.1.1
+
+
+def _ac(ac: int, version: int) -> bytes:
+    return ber(0x06, bytes([0x04, 0x00, 0x00, 0x01, 0x00, ac, version]))
+
+
+def _dialogue(apdu: bytes) -> bytes:
+    return ber(0x6B, ber(0x28, ber(0x06, DIALOGUE_AS) + ber(0xA0, apdu)))
+
+
+def dialogue_request(ac: int, version: int = 3) -> bytes:
+    return _dialogue(ber(0x60, ber(0x80, b"\x07\x80") + ber(0xA1, _ac(ac, version))))
+
+
+def dialogue_response(ac: int, version: int = 3, result: int = 0, user_diag: int = 0) -> bytes:
+    return _dialogue(
+        ber(
+            0x61,
+            ber(0x80, b"\x07\x80")
+            + ber(0xA1, _ac(ac, version))
+            + ber(0xA2, ber_int(0x02, result))
+            + ber(0xA3, ber(0xA1, ber_int(0x02, user_diag))),
+        )
+    )
+
+
+def map_user_abort(choice: int = 0, value: int = 0) -> bytes:
+    """ABRT with MAP-UserAbortInfo: choice 0 userSpecificReason, 2 resourceUnavailable,
+    3 applicationProcedureCancellation (value = the enumerated reason)."""
+    reason = ber(0x80 | choice, b"" if choice in (0, 1) else bytes([value]))
+    user_info = ber(0xBE, ber(0x28, ber(0x06, MAP_DIALOGUE_AS) + ber(0xA0, ber(0xA4, reason))))
+    return _dialogue(ber(0x64, ber(0x80, b"\x00") + user_info))
+
+
+def invoke(invoke_id: int, opcode: int, param: bytes = b"") -> bytes:
+    return ber(0xA1, ber_int(0x02, invoke_id) + ber_int(0x02, opcode) + param)
+
+
+def result(invoke_id: int, opcode: int | None = None, param: bytes = b"") -> bytes:
+    body = ber_int(0x02, invoke_id)
+    if opcode is not None:
+        body += ber(0x30, ber_int(0x02, opcode) + param)
+    return ber(0xA2, body)
+
+
+def error(invoke_id: int, code: int, param: bytes = b"") -> bytes:
+    return ber(0xA3, ber_int(0x02, invoke_id) + ber_int(0x02, code) + param)
+
+
+def reject(invoke_id: int, problem_tag: int, problem: int) -> bytes:
+    """problem_tag: 0x80 general, 0x81 invoke, 0x82 returnResult, 0x83 returnError."""
+    return ber(0xA4, ber_int(0x02, invoke_id) + ber_int(problem_tag, problem))
+
+
+def _components(comps: list[bytes]) -> bytes:
+    return ber(0x6C, b"".join(comps)) if comps else b""
+
+
+def _tid(tag: int, tid: int) -> bytes:
+    return ber(tag, tid.to_bytes(4, "big"))
+
+
+def tc_begin(otid: int, comps: list[bytes], dialogue: bytes = b"") -> bytes:
+    return ber(0x62, _tid(0x48, otid) + dialogue + _components(comps))
+
+
+def tc_continue(otid: int, dtid: int, comps: list[bytes], dialogue: bytes = b"") -> bytes:
+    return ber(0x65, _tid(0x48, otid) + _tid(0x49, dtid) + dialogue + _components(comps))
+
+
+def tc_end(dtid: int, comps: list[bytes], dialogue: bytes = b"") -> bytes:
+    return ber(0x64, _tid(0x49, dtid) + dialogue + _components(comps))
+
+
+def tc_abort(dtid: int, p_abort: int | None = None, dialogue: bytes = b"") -> bytes:
+    cause = ber_int(0x4A, p_abort) if p_abort is not None else b""
+    return ber(0x67, _tid(0x49, dtid) + cause + dialogue)
+
+
+def _sccp_address(ssn: int) -> bytes:
+    return bytes([0x42, ssn])  # route on SSN, SSN present, ITU
+
+
+def sccp_udt(called_ssn: int, calling_ssn: int, data: bytes) -> bytes:
+    called, calling = _sccp_address(called_ssn), _sccp_address(calling_ssn)
+    p1 = 3
+    p2 = p1 - 1 + 1 + len(called)
+    p3 = p2 - 1 + 1 + len(calling)
+    return (
+        bytes([0x09, 0x80, p1, p2, p3])
+        + bytes([len(called)])
+        + called
+        + bytes([len(calling)])
+        + calling
+        + bytes([len(data)])
+        + data
+    )
+
+
+def m3ua_data(sccp: bytes, opc: int = 100, dpc: int = 200) -> bytes:
+    pd = struct.pack("!IIBBBB", opc, dpc, 3, 2, 0, 0) + sccp
+    param = struct.pack("!HH", 0x0210, 4 + len(pd)) + pd + b"\x00" * (-len(pd) % 4)
+    return struct.pack("!BBBBI", 1, 0, 1, 1, 8 + len(param)) + param
+
+
+_next_tsn = {True: 1, False: 1}
+
+
+def sctp_frame(from_a: bool, payloads: list[bytes]) -> bytes:
+    """One SCTP packet; several payloads become several DATA chunks (bundling).
+
+    TSNs increase per direction so tshark never mistakes a frame for a retransmission.
+    """
+    src, dst = (STP_A, STP_B) if from_a else (STP_B, STP_A)
+    chunks = b""
+    for payload in payloads:
+        tsn = _next_tsn[from_a]
+        _next_tsn[from_a] += 1
+        data = struct.pack("!IHHI", tsn, 0, tsn & 0xFFFF, 3) + payload  # PPID 3 = M3UA
+        chunk = struct.pack("!BBH", 0, 0x03, 4 + len(data)) + data
+        chunks += chunk + b"\x00" * (-len(chunk) % 4)
+    sport, dport = (2905, 2906) if from_a else (2906, 2905)  # distinct ends: TSN per side
+    common = struct.pack("!HHII", sport, dport, 1, 0)
+    return _eth(_ipv4(src, dst, 132, common + chunks))
+
+
+def map_frame(from_a: bool, *tcap_messages: bytes, called: int = SSN_HLR, calling: int = SSN_VLR):
+    """from_a: visited side (VLR/SGSN/SMSC) -> home side (HLR) when True."""
+    if not from_a:
+        called, calling = calling, called
+    return sctp_frame(from_a, [m3ua_data(sccp_udt(called, calling, m)) for m in tcap_messages])
+
+
+def map_imsi(imsi: str = TEST_IMSI, tag: int = 0x04) -> bytes:
+    return ber(tag, tbcd(imsi))
+
+
+# MAP operation codes (TS 29.002 17.5) and error codes (17.6) used by tests
+OP_UL, OP_CL, OP_ISD, OP_UGL, OP_SRI_SM, OP_MO_FSM, OP_MT_FSM, OP_SAI = 2, 3, 7, 23, 45, 46, 44, 56
+
+
+def sai_arg(imsi: str = TEST_IMSI) -> bytes:
+    return ber(0x30, map_imsi(imsi, 0x80) + ber_int(0x02, 1))
+
+
+def ul_arg(imsi: str = TEST_IMSI) -> bytes:
+    addr = ber(0x04, b"\x91" + tbcd("1234567890"))
+    return ber(0x30, map_imsi(imsi) + ber(0x81, b"\x91" + tbcd("1234567890")) + addr)

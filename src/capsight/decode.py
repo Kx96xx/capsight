@@ -68,7 +68,20 @@ def build_command(
 # Fields kept for packets outside the core protocols: just enough for user-plane rules.
 NON_CORE_KEEP = ("ip.src", "ip.dst")
 CORE = frozenset(
-    ("diameter", "gtpv2", "gtp", "radius", "nas-eps", "s1ap", "ngap", "nas-5gs", "pfcp", "sip")
+    (
+        "diameter",
+        "gtpv2",
+        "gtp",
+        "radius",
+        "nas-eps",
+        "s1ap",
+        "ngap",
+        "nas-5gs",
+        "pfcp",
+        "sip",
+        "tcap",
+        "gsm_map",
+    )
 )
 INTERN_MAX = 40  # values shorter than this repeat a lot (IMSIs, causes, hosts): share them
 

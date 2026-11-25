@@ -10,10 +10,12 @@ from pathlib import Path
 from capsight import (
     fields,
     rules_5g,  # noqa: F401  (registers 5G rules)
+    rules_map,  # noqa: F401  (registers MAP rules)
     rules_pcc,  # noqa: F401  (registers Gx/Gy rules)
     rules_roaming,  # noqa: F401  (registers roaming rules)
 )
 from capsight.correlate import DiameterCorrelator, Gtpv2Correlator, PfcpCorrelator
+from capsight.correlate_map import MapCorrelator
 from capsight.decode import read_packets
 from capsight.identity import ngap_imsi_map, s1ap_imsi_map
 from capsight.model import Finding, Packet
@@ -37,6 +39,7 @@ CORE_PROTOCOLS = (
     "pfcp",
     "gtp",
     "sip",
+    "gsm_map",
 )
 
 
@@ -75,6 +78,7 @@ class Collector:
         self.diameter = DiameterCorrelator()
         self.gtpv2 = Gtpv2Correlator()
         self.pfcp = PfcpCorrelator()
+        self.map = MapCorrelator()
 
     def feed(self, packet: Packet) -> None:
         self.count += 1
@@ -90,6 +94,7 @@ class Collector:
         self.diameter.feed(packet)
         self.gtpv2.feed(packet)
         self.pfcp.feed(packet)
+        self.map.feed(packet)
         if not SIGNALLING.isdisjoint(packet.protocols):
             self.kept.append(packet)
 
@@ -109,6 +114,7 @@ def analyze_packets(
     diameter = collector.diameter.finish()
     gtpv2 = collector.gtpv2.finish()
     pfcp = collector.pfcp.finish()
+    map_txs = collector.map.finish()
     kept = collector.kept
     start = collector.start or 0.0
     end = collector.end
@@ -122,13 +128,20 @@ def analyze_packets(
         inferred_imsi={**s1ap_imsi_map(kept), **ngap_imsi_map(kept)},
         pfcp=pfcp,
         flows=collector.flows,
+        map=map_txs,
+        capture_start=start,
     )
     report = Report(
         capture=capture,
         packets=collector.count,
         duration_s=round(end - start, 3),
         core_protocols={p: counts[p] for p in CORE_PROTOCOLS if counts[p]},
-        transactions={"diameter": len(diameter), "gtpv2": len(gtpv2), "pfcp": len(pfcp)},
+        transactions={
+            "diameter": len(diameter),
+            "gtpv2": len(gtpv2),
+            "pfcp": len(pfcp),
+            **({"map": len(map_txs)} if map_txs else {}),
+        },
         findings=run_rules(ctx),
     )
     if imsi is not None:
