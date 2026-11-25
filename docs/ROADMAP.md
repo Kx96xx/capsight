@@ -42,6 +42,11 @@ completion with no crash and no flood of false findings; timings recorded in VAL
 Exit test: the local real-world corpus has no unexplained failure types; every new rule has
 its own synthetic test.
 
+Result (0.3.0): 1,142 local captures scanned for findings that fall back to a raw code or
+"unknown". One was found (Diameter 5008, now named with the full RFC 6733 set). The only
+other gap is two MAP aborts bundled in one SCTP packet whose reasons cannot be told apart in
+tshark's output; capsight says so instead of guessing. Every v0.3 rule has its own test.
+
 ## v0.4: voice and SMS
 
 - **VoLTE**: SIP REGISTER / INVITE failures with the response code explained, plus the IMS

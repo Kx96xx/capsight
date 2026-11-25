@@ -246,7 +246,7 @@ Captures contain subscriber identities. capsight runs entirely on your machine, 
 
 ## Roadmap
 
-v0.2 real-capture usability (released), v0.3 operator coverage (roaming, Gx/Gy, MAP), v0.4 voice and SMS, v0.5 diagrams/HTML/MCP, v1.0 stable. Details and exit tests: [docs/ROADMAP.md](https://github.com/Kx96xx/capsight/blob/main/docs/ROADMAP.md).
+v0.2 real-capture usability (released), v0.3 operator coverage: roaming, Gx/Gy, MAP, ciphered 5G NAS (released), v0.4 voice and SMS, v0.5 diagrams/HTML/MCP, v1.0 stable. Details and exit tests: [docs/ROADMAP.md](https://github.com/Kx96xx/capsight/blob/main/docs/ROADMAP.md).
 
 ## Contributing
 

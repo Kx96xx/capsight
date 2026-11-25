@@ -1,6 +1,6 @@
 [project]
 name = "capsight"
-version = "0.2.0"
+version = "0.3.0"
 description = "Drop in a 4G/5G packet capture, get a plain-English diagnosis of why a device couldn't attach, register or get data."
 readme = "README.md"
 license = "MIT"
