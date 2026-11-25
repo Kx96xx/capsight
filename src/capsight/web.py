@@ -35,6 +35,32 @@ real subscriber data to a public demo: run capsight locally for those.
 """
 
 
+def analyze_upload(path: str, display_name: str | None = None):
+    """Analyze a file and return (Report, None) or (None, error message).
+
+    The file is copied to a private temp dir, analyzed and deleted (unless it is a demo
+    capture). Used by the Streamlit page, which renders the Report itself.
+    """
+    src = Path(path)
+    if src.suffix.lower() not in ALLOWED:
+        return None, f"Unsupported file type {src.suffix!r}. Use .pcap or .pcapng."
+    if src.stat().st_size > MAX_BYTES:
+        return None, "File is larger than 20 MB. Run capsight locally for big captures."
+    workdir = Path(tempfile.mkdtemp(prefix="capsight-"))
+    try:
+        copy = workdir / f"upload{src.suffix.lower()}"
+        shutil.copyfile(src, copy)
+        report = analyze(copy)
+        report.capture = display_name or src.name
+        return report, None
+    except TsharkError as exc:
+        return None, f"Could not read this capture: {exc}"
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+        if not _is_sample(src):
+            src.unlink(missing_ok=True)
+
+
 def diagnose(path: str | None) -> str:
     """Analyze an uploaded file and return the text report (or a readable error)."""
     if not path:
