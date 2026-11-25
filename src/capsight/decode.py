@@ -108,7 +108,7 @@ def parse_ek_line(line: str, field_names: Sequence[str] = ()) -> Packet | None:
     names = _name_map(tuple(field_names))
     fields = {sys.intern(names.get(k, k.replace("_", "."))): v for k, v in layers.items()}
     number = int(_first(fields.pop("frame.number")))
-    time = float(_first(fields.pop("frame.time_epoch")))
+    time = float(_first(fields.pop("frame.time_epoch", "0")))  # records may have no time
     protocols = _protocols(_first(fields.pop("frame.protocols", "")))
     if CORE.isdisjoint(protocols):
         fields = {k: fields[k] for k in NON_CORE_KEEP if k in fields}

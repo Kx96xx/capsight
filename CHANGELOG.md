@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix: a capture record without a timestamp (tshark opens some non-capture files, e.g. MP4,
+  that way) no longer crashes the analysis.
 - Roaming: S8 Create Session rejects and timeouts from a visited SGW, with the visited
   network (MCC/MNC from the Serving Network IE) and roaming-specific hints; S6a rejects
   show the Visited-PLMN-Id.
