@@ -35,6 +35,7 @@ class Context:
     capture_end: float
     answer_timeout: float = 5.0
     inferred_imsi: dict[int, str] = field(default_factory=dict)
+    pfcp: list[Transaction] = field(default_factory=list)
 
     def imsi_of(self, packet: Packet) -> str | None:
         return packet.first("e212.imsi") or self.inferred_imsi.get(packet.number)

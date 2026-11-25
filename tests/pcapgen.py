@@ -197,3 +197,50 @@ def radius_frame(from_gateway: bool, payload: bytes) -> bytes:
     src, dst = (HOST_B, AAA_HOST) if from_gateway else (AAA_HOST, HOST_B)
     sport, dport = (40100, 1812) if from_gateway else (1812, 40100)
     return udp_frame(src, dst, sport, dport, payload)
+
+
+# ---- PFCP -------------------------------------------------------------------------------
+
+UPF_HOST = bytes([192, 0, 2, 40])
+
+
+def _pfcp_ie(ie_type: int, data: bytes) -> bytes:
+    return struct.pack("!HH", ie_type, len(data)) + data
+
+
+def pfcp(msg_type: int, seq: int, seid: int | None = None, cause: int | None = None) -> bytes:
+    body = _pfcp_ie(19, bytes([cause])) if cause is not None else b""
+    if seid is None:
+        header_rest = seq.to_bytes(3, "big") + b"\x00"
+        flags = 0x20
+    else:
+        header_rest = struct.pack("!Q", seid) + seq.to_bytes(3, "big") + b"\x00"
+        flags = 0x21
+    length = len(header_rest) + len(body)
+    return bytes([flags, msg_type]) + struct.pack("!H", length) + header_rest + body
+
+
+def pfcp_frame(from_smf: bool, payload: bytes) -> bytes:
+    src, dst = (HOST_B, UPF_HOST) if from_smf else (UPF_HOST, HOST_B)
+    return udp_frame(src, dst, 8805, 8805, payload)
+
+
+# ---- GTP-U ------------------------------------------------------------------------------
+
+UE_IP = bytes([10, 45, 0, 5])
+DN_IP = bytes([203, 0, 113, 8])  # RFC 5737 TEST-NET-3, stands in for an internet host
+
+
+def icmp_echo(src: bytes, dst: bytes, reply: bool = False) -> bytes:
+    icmp = bytes([0 if reply else 8, 0]) + b"\x00\x00" + b"\x00\x01\x00\x01" + b"ping"
+    return _ipv4(src, dst, 1, icmp)
+
+
+def gtpu_frame(uplink: bool, inner: bytes, teid: int = 0xA002) -> bytes:
+    gtp = bytes([0x30, 0xFF]) + struct.pack("!HI", len(inner), teid) + inner
+    src, dst = (HOST_A, UPF_HOST) if uplink else (UPF_HOST, HOST_A)
+    return udp_frame(src, dst, 2152, 2152, gtp)
+
+
+def plain_ip_frame(inner: bytes) -> bytes:
+    return _eth(inner)

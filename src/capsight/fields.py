@@ -33,6 +33,48 @@ NAS_EPS = (
 
 IDENTITY = ("e212.imsi", "s1ap.ENB_UE_S1AP_ID", "s1ap.MME_UE_S1AP_ID")
 
-ALL = (*DIAMETER, *GTPV2, *RADIUS, *NAS_EPS, *IDENTITY)
+NGAP = (
+    "ngap.procedureCode",
+    "ngap.NGAP_PDU",
+    "ngap.Cause",
+    "ngap.radioNetwork",
+    "ngap.transport",
+    "ngap.nas",
+    "ngap.protocol",
+    "ngap.misc",
+    "ngap.RAN_UE_NGAP_ID",
+)
+
+NAS_5GS = (
+    "nas-5gs.mm.message_type",
+    "nas-5gs.sm.message_type",
+    "nas-5gs.mm.5gmm_cause",
+    "nas-5gs.sm.5gsm_cause",
+    "nas-5gs.cmn.dnn",
+    "nas-5gs.mm.suci.scheme_id",
+    "nas-5gs.mm.suci.msin",
+    "e212.mcc",
+    "e212.mnc",
+)
+
+PFCP = ("pfcp.msg_type", "pfcp.seqno", "pfcp.cause", "pfcp.seid")
+
+USER_PLANE = ("ip.src", "ip.dst", "gtp.teid")
+
+ALL = (
+    *DIAMETER,
+    *GTPV2,
+    *RADIUS,
+    *NAS_EPS,
+    *IDENTITY,
+    *NGAP,
+    *NAS_5GS,
+    *PFCP,
+    *USER_PLANE,
+)
+
+# tshark preferences applied when available. Lab cores often run NAS with the null cipher
+# (NEA0); this lets tshark decode the 5GSM payload in those captures.
+PREFERENCES = {"nas-5gs.null_decipher": "TRUE"}
 
 DISPLAY_FILTER = "diameter or gtpv2 or nas-eps or s1ap or radius"

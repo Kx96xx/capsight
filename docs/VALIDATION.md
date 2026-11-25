@@ -19,6 +19,31 @@ Source: <https://blog.colte.network/pcap-library> (`pcaps.zip`). A single-machin
 
 5 of 5 match the documented outcome, with no false alarms on the three healthy captures.
 
+## 5G SA protocol lab (Open5GS + UERANSIM)
+
+Source: <https://github.com/abdelrahman-fawaz18/5g-sa-core-protocol-lab> (MIT), `captures/`.
+Open5GS 2.8 with UERANSIM; each fault case has a documented cause plus a recovery capture.
+capsight run with tshark 4.6.
+
+| Capture | What the source says happened | capsight verdict | Match |
+|---|---|---|---|
+| `fault-injection/plmn-mismatch/fault.pcap` | gNB PLMN not served by the AMF | NG Setup failed: misc=unknown-PLMN-or-SNPN; fix names PLMN and TAI lists | yes |
+| `fault-injection/tac-mismatch/fault.pcap` | gNB tracking area not served | NG Setup failed: misc=unknown-PLMN-or-SNPN; fix names PLMN and TAI lists | yes |
+| `fault-injection/authentication-key-mismatch/fault.pcap` | Wrong subscriber key, 5G-AKA fails | MAC failure (K/OPc mismatch), then Authentication Reject, SUPI shown | yes |
+| `fault-injection/unsupported-dnn/fault.pcap` | UE asks for an unsubscribed DNN; no session | PDU session refused by the AMF: 5GMM #91, names DNN `unsupported`, never reached an SMF | yes |
+| `fault-injection/missing-n6-nat/fault.pcap` | No NAT on N6: uplink leaves, nothing returns | User plane one-way from the UE address, private source left on N6; fix: NAT/masquerade | yes |
+| `baseline/registration-resynchronization.pcap` | Normal registration with an SQN resync | Info: resync, then authentication succeeded | yes |
+| `baseline/full-lifecycle.pcap`, `baseline/pdu-session-user-plane.pcap` | Healthy | No known failure patterns | yes |
+| 4 `recovery.pcap` files | Healthy after the fix | No known failure patterns | yes |
+
+12 of 12 match, with no false alarms on the 6 healthy captures.
+
+Notes:
+- 5G NAS after security mode is ciphered. These lab captures use the null cipher (NEA0);
+  capsight asks tshark to decode that case, which is how the DNN and 5GMM #91 become visible.
+  With a real cipher the NAS payload is opaque and capsight falls back to NGAP/PFCP evidence.
+- The SUPI is shown only when the SUCI uses the null scheme. A concealed SUCI is never guessed.
+
 ## Operator failure patterns
 
 The tests in `tests/test_operator_patterns.py` reproduce failure shapes seen in a production
