@@ -194,3 +194,32 @@ def test_s8_same_cause_from_two_visited_networks_is_one_finding(tmp_path):
     [f] = problems(write_pcap(tmp_path / "s8-two.pcap", frames))
     assert f.count == 3
     assert "visited networks MCC 001 MNC 02, MCC 001 MNC 03" in f.why
+
+
+@needs_tshark
+def test_home_rejects_kept_next_to_roaming_rejects_with_same_cause(tmp_path):
+    # Roaming rejects come first, so they fill the generic finding's evidence; the home
+    # rejects with the same cause must still be reported, not swallowed by roaming.s8.
+    frames = []
+    for seq in (1, 2, 3):
+        frames += [
+            (T0 + seq, gtpv2_frame(True, csr(seq))),
+            (T0 + seq + 0.01, gtpv2_frame(False, gtpv2(33, seq, [ie_cause(73)], teid=seq))),
+        ]
+    for seq in (4, 5):
+        frames += [
+            (T0 + seq, gtpv2_frame(True, csr(seq, interface=S11_MME_GTPC))),
+            (T0 + seq + 0.01, gtpv2_frame(False, gtpv2(33, seq, [ie_cause(73)], teid=seq))),
+        ]
+    found = {f.rule_id: f.count for f in problems(write_pcap(tmp_path / "mix.pcap", frames))}
+    assert found == {"roaming.s8": 3, "gtpv2.cause": 2}
+
+
+@needs_tshark
+def test_one_directional_roaming_capture_is_a_warning_not_timeouts(tmp_path):
+    frames = [(T0 + seq, gtpv2_frame(True, csr(seq))) for seq in range(1, 26)]
+    frames.append((T0 + 60, gtpv2_frame(True, gtpv2(1, 99, [], teid=0))))
+    found = [f for f in analyze(write_pcap(tmp_path / "oneway.pcap", frames)).findings]
+    rules = {f.rule_id for f in found if "Create Session" in f.verdict or f.rule_id == "roaming.s8"}
+    assert rules == {"gtpv2.unanswered"}
+    assert all(f.severity == "warning" for f in found if f.rule_id == "gtpv2.unanswered")

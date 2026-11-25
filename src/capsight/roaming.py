@@ -7,7 +7,10 @@ or IP addresses, and it is shown as MCC/MNC, not as an operator name.
 
 from __future__ import annotations
 
+from capsight.correlate import Transaction
 from capsight.model import Packet
+
+CREATE_SESSION = "Create Session Request"
 
 # GTPv2 F-TEID interface type 6 = S5/S8 SGW GTP-C (TS 29.274 8.22). A Create Session
 # Request from an SGW on S5 or S8 carries it; S8 vs S5 is told apart by the serving network.
@@ -57,3 +60,17 @@ def came_from_sgw(packet: Packet | None) -> bool:
 
 def plmn_text(plmn: tuple[str, str]) -> str:
     return f"MCC {plmn[0]} MNC {plmn[1]}"
+
+
+def visited_network(tx: Transaction) -> tuple[str, str] | None:
+    """The visited PLMN when this is a roaming Create Session over S8, else None.
+
+    Roaming is claimed only when proven: the request came from an SGW (F-TEID interface
+    S5/S8 SGW) and its Serving Network is not the IMSI's home network.
+    """
+    if tx.name != CREATE_SESSION or tx.request is None:
+        return None
+    visited = serving_plmn(tx.request)
+    if came_from_sgw(tx.request) and is_visiting(tx.imsi, visited):
+        return visited
+    return None

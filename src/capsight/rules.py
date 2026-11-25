@@ -22,7 +22,7 @@ from capsight.codes import (
 )
 from capsight.correlate import Transaction, to_bool, to_int
 from capsight.model import Finding, Packet, Severity
-from capsight.roaming import decode_plmn, is_visiting, plmn_text
+from capsight.roaming import decode_plmn, is_visiting, plmn_text, visited_network
 
 MAX_EVIDENCE = 5
 ESM_PDN_CONNECTIVITY_REJECT = 0xD1
@@ -210,11 +210,28 @@ ONE_WAY_MIN_REQUESTS = 20
 ONE_WAY_MAX_ANSWER_RATIO = 0.05
 
 
+def one_way_commands(txs: list[Transaction]) -> set[str]:
+    """Command names whose answers are (almost) all missing: a one-directional capture."""
+    requests: dict[str, int] = {}
+    answers: dict[str, int] = {}
+    for tx in txs:
+        if tx.request is not None:
+            requests[tx.name] = requests.get(tx.name, 0) + 1
+            if tx.answer is not None:
+                answers[tx.name] = answers.get(tx.name, 0) + 1
+    return {
+        name
+        for name, n in requests.items()
+        if n >= ONE_WAY_MIN_REQUESTS and answers.get(name, 0) / n <= ONE_WAY_MAX_ANSWER_RATIO
+    }
+
+
 def _unanswered(
     ctx: Context,
     txs: list[Transaction],
     rule_id: str,
     fix: str,
+    claimed: Callable[[Transaction], bool] = lambda tx: False,
 ) -> Iterator[Finding]:
     """Requests with no answer, unless the capture simply does not contain the answers.
 
@@ -229,11 +246,7 @@ def _unanswered(
             requests[tx.name] = requests.get(tx.name, 0) + 1
             if tx.answer is not None:
                 answers[tx.name] = answers.get(tx.name, 0) + 1
-    one_way = {
-        name
-        for name, n in requests.items()
-        if n >= ONE_WAY_MIN_REQUESTS and answers.get(name, 0) / n <= ONE_WAY_MAX_ANSWER_RATIO
-    }
+    one_way = one_way_commands(txs)
     groups: dict[object, _Group] = {}
     for tx in txs:
         if tx.answer is not None or tx.request is None:
@@ -255,6 +268,8 @@ def _unanswered(
                 )
             _add(groups[key], [tx.request], tx.imsi)
             continue
+        if claimed(tx):
+            continue  # a more specific rule reports this timeout
         if tx.name not in groups:
             groups[tx.name] = _Group(
                 verdict=f"{tx.name} never answered.",
@@ -314,6 +329,8 @@ def gtpv2_rejects(ctx: Context) -> Iterator[Finding]:
         code = lookup(GTPV2_CAUSE, cause)
         source = _cause_source(tx.answer)
         accept = _radius_accept_before(ctx, tx.answer) if cause == GTP_USER_AUTH_FAILED else None
+        if accept is None and visited_network(tx) is not None:
+            continue  # roaming.s8 reports it
         key = (tx.name, cause, source, accept is not None)
         if key not in groups:
             apn = tx.request.first("gtpv2.apn") if tx.request else None
@@ -397,6 +414,7 @@ def gtpv2_unanswered(ctx: Context) -> Iterator[Finding]:
         "gtpv2.unanswered",
         "The peer gateway is unreachable or dropping requests. Check the path (GTP-C on "
         "UDP 2123) and the peer's health.",
+        claimed=lambda tx: visited_network(tx) is not None,  # roaming.s8
     )
 
 
@@ -495,10 +513,9 @@ AUTH_RESPONSE = 0x53
 ATTACH_ACCEPT = 0x42
 
 # A more specific finding replaces a generic one that cites only the same packets.
-# A more specific rule replaces the generic finding for the same packets.
+# (roaming.s8 needs no entry: gtpv2.cause and gtpv2.unanswered skip roaming transactions.)
 SUPERSEDES: dict[str, tuple[str, ...]] = {
     "gtpv2.pdn_type": ("gtpv2.cause", "roaming.s8"),
-    "roaming.s8": ("gtpv2.cause", "gtpv2.unanswered"),
 }
 
 

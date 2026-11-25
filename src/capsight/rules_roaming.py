@@ -10,12 +10,19 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from capsight.codes import GTPV2_CAUSE, lookup
-from capsight.correlate import Transaction, to_bool, to_int
+from capsight.correlate import to_bool, to_int
 from capsight.model import Finding, Severity
-from capsight.roaming import came_from_sgw, is_visiting, plmn_text, serving_plmn
-from capsight.rules import Context, _add, _emit, _Group, rule
-
-CREATE_SESSION = "Create Session Request"
+from capsight.roaming import plmn_text, visited_network
+from capsight.rules import (
+    GTP_USER_AUTH_FAILED,
+    Context,
+    _add,
+    _emit,
+    _Group,
+    _radius_accept_before,
+    one_way_commands,
+    rule,
+)
 
 # Roaming-specific reading of common causes; anything else falls back to the cause table.
 ROAMING_HINT = {
@@ -37,13 +44,6 @@ ROAMING_HINT = {
 }
 
 
-def _roaming(tx: Transaction) -> tuple[str, str] | None:
-    visited = serving_plmn(tx.request)
-    if came_from_sgw(tx.request) and is_visiting(tx.imsi, visited):
-        return visited
-    return None
-
-
 def _networks(plmns: set[tuple[str, str]]) -> str:
     names = ", ".join(plmn_text(p) for p in sorted(plmns)[:5])
     more = f" and {len(plmns) - 5} more" if len(plmns) > 5 else ""
@@ -55,14 +55,13 @@ def _networks(plmns: set[tuple[str, str]]) -> str:
 def s8_rejects(ctx: Context) -> Iterator[Finding]:
     groups: dict[object, _Group] = {}
     seen: dict[object, dict[str, set]] = {}
+    one_way = one_way_commands(ctx.gtpv2)  # gtpv2.unanswered warns about those instead
     for tx in ctx.gtpv2:
-        if tx.name != CREATE_SESSION or tx.request is None:
-            continue
-        visited = _roaming(tx)
+        visited = visited_network(tx)
         if visited is None:
             continue
         if tx.answer is None:
-            if ctx.capture_end - tx.request.time < ctx.answer_timeout:
+            if tx.name in one_way or ctx.capture_end - tx.request.time < ctx.answer_timeout:
                 continue
             key: tuple = ("unanswered",)
             cause = None
@@ -71,6 +70,8 @@ def s8_rejects(ctx: Context) -> Iterator[Finding]:
             cause = to_int(tx.answer.first("gtpv2.cause"))
             if cause is None or 16 <= cause <= 63:
                 continue
+            if cause == GTP_USER_AUTH_FAILED and _radius_accept_before(ctx, tx.answer):
+                continue  # gtpv2.cause explains a reject after RADIUS accepted the user
             key = ("reject", cause)
             packets = [p for p in (tx.request, tx.answer) if p]
         info = seen.setdefault(key, {"plmns": set(), "apns": set(), "remote": set()})
