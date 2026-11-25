@@ -117,6 +117,34 @@ If the IMSI is not in the capture, capsight lists the subscribers it did find. T
 be written as `001010000000001` or `imsi-001010000000001`. In 5G the subscriber is known only
 when the SUCI is not concealed.
 
+### Busy captures: --summary
+
+On a capture with thousands of failures, `--summary` gives the shape of the problem in one
+screen: top problems by occurrences (with first/last time and how many subscribers),
+the most affected subscribers, and problems over time:
+
+```
+$ capsight analyze hss-5min.pcapng --summary
+
+summary   11 problems, 32,185 occurrences, 7,553 subscribers affected
+
+TOP PROBLEMS
+   1. FAILURE    28,384x  AIR rejected: DIAMETER_ERROR_USER_UNKNOWN.
+                          16:25:00 - 16:34:59 UTC, 6,496 subscribers
+   2. FAILURE     3,327x  AIR rejected: DIAMETER_ERROR_UNKNOWN_EPS_SUBSCRIPTION.
+   ...
+MOST AFFECTED SUBSCRIBERS
+  001010000000001          57x  AIR rejected: DIAMETER_ERROR_USER_UNKNOWN.
+  ...
+OVER TIME (UTC, per 1 min)
+  16:25  ######################################## 5,976
+  16:30  #### 559
+```
+
+Time buckets grow with the capture (1 minute up to a day) so the chart stays under 25 rows.
+`--format json --summary` adds the same data under `summary`. Without `--summary`, capsight
+suggests it once a capture has 100+ problem occurrences.
+
 ### 4. Web demo
 
 A small upload page, for people who would rather not use a terminal:

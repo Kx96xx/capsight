@@ -78,7 +78,11 @@ class _Group:
     imsis: set[str] = field(default_factory=set)
     count: int = 0
     retransmissions: int = 0
+    times: list[float] = field(default_factory=list)
+    per_imsi: dict[str, int] = field(default_factory=dict)
 
+
+TOP_SUBSCRIBERS = 50
 
 Rule = Callable[[Context], Iterator[Finding]]
 RULES: list[tuple[str, Rule]] = []
@@ -114,14 +118,32 @@ def _emit(rule_id: str, groups: dict[object, _Group]) -> Iterator[Finding]:
             fix=group.fix,
             subscribers=tuple(sorted(group.imsis)),
             count=group.count,
+            first_time=min(group.times) if group.times else None,
+            last_time=max(group.times) if group.times else None,
+            per_minute=_per_minute(group.times),
+            by_subscriber=tuple(
+                sorted(group.per_imsi.items(), key=lambda kv: (-kv[1], kv[0]))[:TOP_SUBSCRIBERS]
+            ),
         )
+
+
+def _per_minute(times: list[float]) -> tuple[tuple[int, int], ...]:
+    buckets: dict[int, int] = {}
+    for t in times:
+        minute = int(t // 60) * 60
+        buckets[minute] = buckets.get(minute, 0) + 1
+    return tuple(sorted(buckets.items()))
 
 
 def _add(group: _Group, packets: list[Packet], imsi: str | None) -> None:
     group.count += 1
-    group.evidence.extend(p.number for p in packets)
+    if len(group.evidence) < MAX_EVIDENCE:
+        group.evidence.extend(p.number for p in packets)
+    if packets:
+        group.times.append(packets[-1].time)
     if imsi:
         group.imsis.add(imsi)
+        group.per_imsi[imsi] = group.per_imsi.get(imsi, 0) + 1
 
 
 @rule("diameter.result")

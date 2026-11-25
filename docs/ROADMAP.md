@@ -21,7 +21,7 @@ Exit test: `pip install capsight` works and the hosted web demo is live.
   authentication, session and data steps in order and marks where it broke.
 - [x] **Large captures** (streaming; 1.1 GB in 844 MB, see VALIDATION.md): stream packets instead of loading them all, pre-filter in tshark, and
   publish timings for 100 MB / 1 GB files.
-- **Summary mode** for busy captures: top failures, most affected subscribers, failures over
+- [x] **Summary mode** for busy captures: top failures, most affected subscribers, failures over
   time. Thousands of identical rejects become one line with a count.
 - **`--redact`**: mask IMSI, MSISDN, IP addresses and realms in all output formats.
 

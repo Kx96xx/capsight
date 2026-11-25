@@ -41,3 +41,10 @@ class Finding:
     fix: str = ""
     subscribers: tuple[str, ...] = ()
     count: int = 1
+    # When it happened: first/last occurrence (epoch seconds) and occurrences per minute,
+    # as (minute start epoch, count). Used by summary mode.
+    first_time: float | None = None
+    last_time: float | None = None
+    per_minute: tuple[tuple[int, int], ...] = ()
+    # Occurrences per subscriber, most affected first (top 20).
+    by_subscriber: tuple[tuple[str, int], ...] = ()
