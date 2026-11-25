@@ -35,6 +35,14 @@ DIAMETER_COMMANDS: dict[int, tuple[str, str]] = {
     301: ("SAR", "SAA"),
     302: ("LIR", "LIA"),
     303: ("MAR", "MAA"),
+    304: ("RTR", "RTA"),
+    305: ("PPR", "PPA"),
+    306: ("UDR", "UDA"),
+    307: ("PUR", "PUA"),
+    308: ("SNR", "SNA"),
+    309: ("PNR", "PNA"),
+    8388620: ("PLR", "PLA"),
+    8388622: ("LRR", "LRA"),
 }
 
 # Base protocol Result-Code values (RFC 6733, RFC 4006).

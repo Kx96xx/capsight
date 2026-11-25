@@ -35,6 +35,25 @@ test-network identities, so no production data is in this repository.
 | Attach and default bearer succeed, then an extra APN is rejected (ESM #33) | Warning, not failure: data on the default APN works |
 | GTPv2 cause source bit set | Says whether the responder or a node further down the path raised the cause |
 
+## Large-scale run on operator captures (local only)
+
+capsight was run locally on 93 production captures (Diameter S6a, GTPv2-C, MAP; 1 KB to
+200 MB each, about 500k packets total). The captures and results never left the machine.
+Every capsight count was compared with an independent `tshark` display-filter count.
+
+- No crashes or decode errors on any of the 93 files.
+- **Diameter failures**: capsight's grouped counts matched tshark's failed-answer count on
+  every file, except where one frame carries several Diameter messages (SCTP bundling); there
+  capsight counts each message, tshark counts the frame once.
+- **GTPv2-C rejects**: every file tshark flagged was flagged by capsight, and no extra ones.
+  Where the raw count was double, capsight's lower number is correct: those were
+  retransmitted responses (same sequence number), folded into one failure each.
+- **Bug found and fixed**: captures filtered on one host (requests captured, answers not)
+  produced tens of thousands of false "never answered" failures. capsight now detects a
+  one-directional capture and reports one warning instead.
+- **Not yet covered**: these captures had no S1AP/NAS (no EMM/ESM rejects to check) and
+  include MAP (2G/3G) signalling, which capsight does not analyse yet.
+
 ## Wanted
 
 More public captures, especially: roaming rejects, GTPv2 rejections from a real gateway,
