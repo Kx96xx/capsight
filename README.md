@@ -4,6 +4,8 @@
 
 > Status: early development. 4G core (Diameter S6a, GTPv2-C, EPS NAS, RADIUS) and 5G SA (NGAP, 5G NAS, PFCP, GTP-U) work today. See [docs/PLAN.md](docs/PLAN.md).
 
+**Try it in the browser:** [capsight-dewfuba7pvrbayxcmnamqb.streamlit.app](https://capsight-dewfuba7pvrbayxcmnamqb.streamlit.app/) (pick a demo capture or upload your own; the app sleeps when idle and takes ~30 s to wake).
+
 ![capsight diagnosing two captures](docs/img/demo.svg)
 
 Debugging a mobile core usually means scrolling through thousands of Diameter, GTP and NAS packets in Wireshark and looking up result codes and cause values by hand. capsight does that part: it pairs requests with answers, matches known failure patterns and tells you what broke, for whom, where in the capture, and what to check next.
@@ -124,7 +126,7 @@ pip install "capsight[web]"
 capsight-web                     # http://127.0.0.1:7860
 ```
 
-Uploads are analyzed in a temporary folder and deleted right after. The hosted demo runs
+Uploads are analyzed in a temporary folder and deleted right after. The [hosted demo](https://capsight-dewfuba7pvrbayxcmnamqb.streamlit.app/) runs
 `web/streamlit_app.py` on Streamlit Community Cloud; `web/Dockerfile` builds the Gradio page
 as a container for self-hosting.
 
