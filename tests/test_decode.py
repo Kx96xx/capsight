@@ -53,3 +53,12 @@ def test_underscore_field_names_round_trip():
     packet = parse_ek_line(json.dumps(doc), ["nas_eps.emm.cause"])
     assert packet is not None
     assert packet.first("nas_eps.emm.cause") == "8"
+
+
+def test_packet_without_timestamp_does_not_crash():
+    # tshark opens some non-capture files (e.g. MP4) as one record with no frame.time_epoch.
+    doc = {"layers": {"frame_number": ["1"], "frame_protocols": ["mp4"]}}
+    packet = parse_ek_line(json.dumps(doc))
+    assert packet is not None
+    assert packet.number == 1
+    assert packet.time == 0.0
