@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.3.0
+
+Operator network coverage: roaming, policy and charging, 2G/3G MAP, ciphered 5G NAS.
+
 - Ciphered 5G NAS: an INFO finding says how many NAS messages were encrypted and with
   which algorithm; registration that never completed and registrations with no PDU session
   are inferred from NGAP (Initial Context Setup, PDU Session Resource Setup, UE Context
@@ -10,6 +14,8 @@
   location update, SMS routing and delivery), TCAP aborts with the reason, TCAP rejects,
   unanswered operations (30 s MAP timer floor), and a warning when the capture holds answers
   without their requests. SCTP-bundled TCAP messages are split exactly or left alone.
+- All RFC 6733 base Diameter Result-Codes are named (5008 DIAMETER_AVP_NOT_ALLOWED was shown
+  as "code 5008").
 - Fix: a capture record without a timestamp (tshark opens some non-capture files, e.g. MP4,
   that way) no longer crashes the analysis.
 - Roaming: S8 Create Session rejects and timeouts from a visited SGW, with the visited
