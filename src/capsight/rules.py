@@ -146,12 +146,30 @@ def _add(group: _Group, packets: list[Packet], imsi: str | None) -> None:
         group.per_imsi[imsi] = group.per_imsi.get(imsi, 0) + 1
 
 
+PCC_APPS = frozenset({16777238, 4})  # Gx, Diameter Credit-Control (Gy/Ro)
+
+
+def application_of(tx: Transaction) -> int | None:
+    for packet in (tx.answer, tx.request):
+        if packet is None:
+            continue
+        for name in ("diameter.applicationId", "diameter.Auth-Application-Id"):
+            value = to_int(packet.first(name))
+            if value:
+                return value
+    return None
+
+
+def is_pcc(tx: Transaction) -> bool:
+    return application_of(tx) in PCC_APPS
+
+
 @rule("diameter.result")
 def diameter_failures(ctx: Context) -> Iterator[Finding]:
     groups: dict[object, _Group] = {}
     for tx in ctx.diameter:
-        if tx.answer is None:
-            continue
+        if tx.answer is None or is_pcc(tx):
+            continue  # Gx/Gy answers are explained by rules_pcc
         exp = to_int(tx.answer.first("diameter.Experimental-Result-Code"))
         res = to_int(tx.answer.first("diameter.Result-Code"))
         if exp is not None and exp >= 3000:

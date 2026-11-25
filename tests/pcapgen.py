@@ -133,6 +133,83 @@ def s6a_answer(
     return diameter(cmd, False, hbh, hbh + 1, avps)
 
 
+# ---- Gx / Gy (policy and charging) --------------------------------------------------------
+
+GX_APP = 16777238
+GY_APP = 4  # Diameter Credit-Control (Gy/Ro)
+CC_INITIAL, CC_UPDATE, CC_TERMINATION = 1, 2, 3
+
+
+def avp_group(code: int, children: list[bytes], vendor: int | None = None) -> bytes:
+    return avp(code, b"".join(children), vendor)
+
+
+def _experimental(code: int) -> bytes:
+    return avp_group(297, [avp_u32(266, VENDOR_3GPP), avp_u32(298, code)])
+
+
+def ccr(
+    hbh: int,
+    app: int = GY_APP,
+    req_type: int = CC_INITIAL,
+    imsi: str | None = TEST_IMSI,
+    apn: str = "internet",
+    extra: list[bytes] | None = None,
+) -> bytes:
+    avps = [
+        *_common(f"pgw.example.org;{hbh}", "pgw.example.org"),
+        avp_str(283, "example.org"),
+        avp_u32(258, app),
+        avp_u32(416, req_type),
+        avp_u32(415, 0),
+    ]
+    if imsi:
+        avps.append(avp_group(443, [avp_u32(450, 1), avp_str(444, imsi)]))
+    avps.append(avp_str(30, apn))
+    avps += extra or []
+    return diameter(272, True, hbh, hbh + 1, avps, app=app)
+
+
+def cca(
+    hbh: int,
+    app: int = GY_APP,
+    req_type: int = CC_INITIAL,
+    result: int | None = 2001,
+    experimental: int | None = None,
+    extra: list[bytes] | None = None,
+) -> bytes:
+    server = "ocs.example.org" if app == GY_APP else "pcrf.example.org"
+    avps = [*_common(f"pgw.example.org;{hbh}", server), avp_u32(258, app)]
+    if experimental is not None:
+        avps.append(_experimental(experimental))
+    elif result is not None:
+        avps.append(avp_u32(268, result))
+    avps += [avp_u32(416, req_type), avp_u32(415, 0)]
+    avps += extra or []
+    return diameter(272, False, hbh, hbh + 1, avps, app=app)
+
+
+def mscc(rating_group: int, result: int | None = None, final_action: int | None = None) -> bytes:
+    children = [avp_u32(432, rating_group)]
+    if final_action is not None:
+        children.append(avp_group(430, [avp_u32(449, final_action)]))
+    if result is not None:
+        children.append(avp_u32(268, result))
+    return avp_group(456, children)
+
+
+def charging_rule_report(rule: str, failure_code: int, status: int = 1) -> bytes:
+    return avp_group(
+        1018,
+        [
+            avp_str(1005, rule, VENDOR_3GPP),
+            avp_u32(1019, status, VENDOR_3GPP),
+            avp_u32(1031, failure_code, VENDOR_3GPP),
+        ],
+        VENDOR_3GPP,
+    )
+
+
 # ---- GTPv2-C ----------------------------------------------------------------------------
 
 

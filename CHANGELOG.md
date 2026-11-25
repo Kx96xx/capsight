@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Gx/Gy policy and charging: PCRF/OCS rejects by interface and request type, per-service
+  (rating group) credit failures with Final-Unit-Action, policy rules the gateway could not
+  install, and a failed CCR-I linked to the Create Session reject it caused.
+
 ## 0.2.0
 
 First release on PyPI. Usable on real captures.

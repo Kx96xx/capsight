@@ -10,6 +10,7 @@ from pathlib import Path
 from capsight import (
     fields,
     rules_5g,  # noqa: F401  (registers 5G rules)
+    rules_pcc,  # noqa: F401  (registers Gx/Gy rules)
 )
 from capsight.correlate import DiameterCorrelator, Gtpv2Correlator, PfcpCorrelator
 from capsight.decode import read_packets

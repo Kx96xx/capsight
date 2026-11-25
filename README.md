@@ -195,6 +195,13 @@ capsight analyze attach.pcapng --format json | jq '.findings[] | {severity, verd
 - **PDN type split**: IPv4v6 rejected while IPv4 works for the same subscriber
 - Requests with no response, and retransmission folding
 
+**Policy and charging (Gx, Gy)**
+- Policy server (PCRF) and online charging (OCS) rejects, named by interface and request type (e.g. `Gy CCR-I rejected: DIAMETER_CREDIT_LIMIT_REACHED`), with what it means for the user: refused at setup, stopped mid-session, or only a charging-record problem at the end
+- Links a rejected initial request to the session reject it caused, so one problem is not reported as two
+- A single service (rating group) out of credit while the rest of the session works, with what happens next (terminate, redirect to a top-up page, restrict)
+- Policy rules the gateway could not install (Charging-Rule-Report), with the rule name and reason
+- Says which server to fix: "user unknown" in the PCRF/OCS is a different job than in the HSS
+
 **NAS (EPS)**
 - Attach / TAU / Service Reject with EMM cause, linked to the subscriber even when the reject carries no IMSI
 - Authentication failure: MAC failure (SIM and HSS keys differ) vs sync failure (and whether it recovered)
