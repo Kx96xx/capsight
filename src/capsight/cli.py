@@ -11,6 +11,7 @@ from pathlib import Path
 from capsight import __version__
 from capsight.decode import TsharkError
 from capsight.engine import Report, analyze
+from capsight.redact import Redactor
 from capsight.summary import build_summary, render_summary
 
 SUMMARY_HINT_OCCURRENCES = 100
@@ -116,6 +117,16 @@ def main(argv: list[str] | None = None) -> int:
         help="busy captures: top problems, most affected subscribers, problems over time",
     )
     analyze_cmd.add_argument(
+        "--redact",
+        action="store_true",
+        help="mask subscriber numbers, IP addresses and host/realm names in the output",
+    )
+    analyze_cmd.add_argument(
+        "--redact-all",
+        action="store_true",
+        help="like --redact, and also hide the home network (MCC/MNC) of each IMSI",
+    )
+    analyze_cmd.add_argument(
         "--fail-on",
         choices=("failure", "warning", "never"),
         default="never",
@@ -129,13 +140,23 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     summary = build_summary(report) if args.summary else None
+    redactor = Redactor(keep_plmn=not args.redact_all) if args.redact or args.redact_all else None
+    if redactor is not None:
+        # file names often carry hosts, IMSIs or dates: keep only the extension
+        report.capture = "capture" + Path(report.capture).suffix
     if args.format == "json":
         doc = asdict(report)
         if summary is not None:
             doc["summary"] = summary
+        if redactor is not None:
+            doc = redactor.data(doc)
+            doc["redacted"] = True
         print(json.dumps(doc, indent=2))
     else:
-        print(render_text(report, summary))
+        text = render_text(report, summary)
+        if redactor is not None:
+            text = redactor.text(text) + "\n\n" + redactor.counts()
+        print(text)
     return 1 if _should_fail(report, args.fail_on) else 0
 
 
