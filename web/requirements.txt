@@ -1,0 +1,2 @@
+streamlit>=1.40
+capsight @ git+https://github.com/Kx96xx/capsight.git@main

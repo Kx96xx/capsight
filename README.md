@@ -124,8 +124,9 @@ pip install "capsight[web]"
 capsight-web                     # http://127.0.0.1:7860
 ```
 
-Uploads are analyzed in a temporary folder and deleted right after. `web/Dockerfile` builds
-the same page as a container (it is what the hosted demo runs).
+Uploads are analyzed in a temporary folder and deleted right after. The hosted demo runs
+`web/streamlit_app.py` on Streamlit Community Cloud; `web/Dockerfile` builds the Gradio page
+as a container for self-hosting.
 
 ### 5. Use it in scripts / CI
 
