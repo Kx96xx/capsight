@@ -1,7 +1,7 @@
 [project]
 name = "capsight"
 version = "0.1.0"
-description = "Drop in a 4G/5G packet capture, get a plain-English diagnosis of why the call flow failed."
+description = "Drop in a 4G/5G packet capture, get a plain-English diagnosis of why a device couldn't attach, register or get data."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
