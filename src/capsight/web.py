@@ -7,6 +7,7 @@ Uploads are analyzed in a temporary directory and deleted right after the reques
 
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -17,7 +18,13 @@ from capsight.engine import analyze
 
 MAX_BYTES = 20 * 1024 * 1024
 ALLOWED = (".pcap", ".pcapng", ".cap")
-SAMPLES = Path(__file__).resolve().parent.parent.parent / "samples" / "synthetic"
+# Demo captures: from a source checkout, or CAPSIGHT_SAMPLES when installed (e.g. Docker).
+SAMPLES = Path(
+    os.environ.get(
+        "CAPSIGHT_SAMPLES",
+        Path(__file__).resolve().parent.parent.parent / "samples" / "synthetic",
+    )
+)
 
 INTRO = """# capsight
 Drop in a 4G/5G packet capture (`.pcap` / `.pcapng`, up to 20 MB) and get a plain-English
@@ -48,8 +55,16 @@ def diagnose(path: str | None) -> str:
         return f"Could not read this capture: {exc}"
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
-        if src.parent != SAMPLES:
+        if not _is_sample(src):
             src.unlink(missing_ok=True)
+
+
+def _is_sample(path: Path) -> bool:
+    """Example files (or the copy the web framework makes of them) are never deleted."""
+    if path.parent == SAMPLES:
+        return True
+    original = SAMPLES / path.name
+    return original.is_file() and original.stat().st_size == path.stat().st_size
 
 
 def build_app():
