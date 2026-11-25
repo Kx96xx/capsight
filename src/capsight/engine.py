@@ -10,6 +10,7 @@ from pathlib import Path
 from capsight import (
     fields,
     rules_5g,  # noqa: F401  (registers 5G rules)
+    rules_5g_ciphered,  # noqa: F401  (registers ciphered 5G NAS rules)
     rules_map,  # noqa: F401  (registers MAP rules)
     rules_pcc,  # noqa: F401  (registers Gx/Gy rules)
     rules_roaming,  # noqa: F401  (registers roaming rules)

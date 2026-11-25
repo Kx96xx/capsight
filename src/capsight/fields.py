@@ -69,6 +69,9 @@ NAS_5GS = (
     "nas-5gs.mm.5gmm_cause",
     "nas-5gs.sm.5gsm_cause",
     "nas-5gs.cmn.dnn",
+    # ciphering: header type 2/4 = ciphered; the selected algorithm is in Security Mode Command
+    "nas-5gs.security_header_type",
+    "nas-5gs.mm.nas_sec_algo_enc",
     "nas-5gs.mm.suci.scheme_id",
     "nas-5gs.mm.suci.msin",
     "e212.mcc",
