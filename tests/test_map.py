@@ -313,7 +313,7 @@ def tcap_packet(number: int, **fields: list[str]) -> Packet:
 
 
 def test_ambiguous_bundle_is_not_guessed():
-    # BEGIN followed by END looks like one CONTINUE; this real-world bundle has two readings.
+    # BEGIN followed by END looks like one CONTINUE; this bundle has two readings.
     packet = tcap_packet(
         1,
         tcap__tid=["a1", "d1", "a2", "d2", "d3", "a4", "d4", "a5", "d5", "a6", "a7", "d7"],

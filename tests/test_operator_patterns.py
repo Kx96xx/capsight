@@ -1,8 +1,8 @@
-"""Failure patterns seen in a production operator core, rebuilt from scratch.
+"""Failure patterns common in operator cores, built from scratch.
 
-No bytes come from production: every capture is generated here with test-network IMSIs
-(MCC 001 / MNC 01), RFC 5737 addresses and example.org names. Only the *shape* of each
-failure (which message, which cause, what came before it) is reproduced.
+Every capture is generated here with test-network IMSIs (MCC 001 / MNC 01), RFC 5737
+addresses and example.org names. Each test reproduces the *shape* of a failure: which
+message, which cause, what came before it.
 """
 
 from conftest import T0, needs_tshark

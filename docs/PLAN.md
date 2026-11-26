@@ -44,7 +44,7 @@ Rules:
 - [ ] Validate against 10+ public captures (need roaming, GTPv2 reject and 5G samples)
 - [x] Sync failure followed by a successful Authentication Response reported as info, not a failure
 
-- [x] Large-scale local run on 93 operator captures, cross-checked with tshark
+- [x] Large-scale local regression run, cross-checked with tshark
 - [x] One-directional capture detection (missing answers reported as one warning)
 - [ ] MAP (2G/3G) support: SAI / UL / CL / SRI-SM errors
 

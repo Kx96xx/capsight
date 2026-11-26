@@ -19,14 +19,14 @@ Exit test: `pip install capsight` works and the hosted web demo is live.
 
 - [x] **Per-subscriber view**: `capsight analyze file --imsi X` prints that subscriber's attach,
   authentication, session and data steps in order and marks where it broke.
-- [x] **Large captures** (streaming; 1.1 GB in 844 MB, see VALIDATION.md): stream packets instead of loading them all, pre-filter in tshark, and
-  publish timings for 100 MB / 1 GB files.
+- [x] **Large captures** (streaming, see VALIDATION.md): stream packets instead of loading
+  them all, pre-filter in tshark, and publish timings for large files.
 - [x] **Summary mode** for busy captures: top failures, most affected subscribers, failures over
   time. Thousands of identical rejects become one line with a count.
 - [x] **`--redact`**: mask IMSI, MSISDN, IP addresses and realms in all output formats.
 
-Exit test: a corpus of large real-world captures (kept local, never committed) runs to
-completion with no crash and no flood of false findings; timings recorded in VALIDATION.md.
+Exit test: large captures run to completion with no crash and no flood of false findings;
+timings recorded in VALIDATION.md.
 
 ## v0.3: operator network coverage
 
@@ -39,12 +39,12 @@ completion with no crash and no flood of false findings; timings recorded in VAL
 - [x] **Ciphered 5G NAS**: when NAS is encrypted, diagnose from NGAP and PFCP instead and say what
   could not be seen.
 
-Exit test: the local real-world corpus has no unexplained failure types; every new rule has
+Exit test: the local regression corpus has no unexplained failure types; every new rule has
 its own synthetic test.
 
-Result (0.3.0): 1,142 local captures scanned for findings that fall back to a raw code or
-"unknown". One was found (Diameter 5008, now named with the full RFC 6733 set). The only
-other gap is two MAP aborts bundled in one SCTP packet whose reasons cannot be told apart in
+Result (0.3.0): 1,142 captures in the local regression corpus scanned for findings that
+fall back to a raw code or "unknown". One was found (Diameter 5008, now named with the full
+RFC 6733 set). The only other gap is two MAP aborts bundled in one SCTP packet whose reasons cannot be told apart in
 tshark's output; capsight says so instead of guessing. Every v0.3 rule has its own test.
 
 ## v0.4: voice and SMS
