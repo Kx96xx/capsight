@@ -228,6 +228,7 @@ capsight analyze attach.pcapng --format json | jq '.findings[] | {severity, verd
 - PDU session request refused by the AMF (e.g. 5GMM #91, DNN not subscribed), naming the DNN
 - PDU Session Establishment Reject from the SMF with 5GSM cause and DNN
 - PFCP rejects between SMF and UPF (rule creation failure, no association, no resources, ...) and unanswered PFCP requests
+- Session refusals traced from the gateway's GTP-C cause to the UPF's PFCP refusal behind it, including two sessions fighting over one UE address
 - One-way user plane: uplink enters the GTP-U tunnel and nothing comes back, with a NAT hint when a private UE address leaks onto N6
 - SUPI shown when the SUCI is not concealed; never guessed when it is
 - **Ciphered NAS** (NEA1/2/3): says how many NAS messages could not be read and with which algorithm, then infers the outcome from NGAP, which is not encrypted: registration that never completed (no Initial Context Setup, UE released), or registered but no PDU session set up. Each inference names its NGAP evidence and where to look next (AMF/SMF logs)

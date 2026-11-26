@@ -27,6 +27,7 @@ from capsight.codes_5g import (
 from capsight.correlate import to_int
 from capsight.model import Finding, Packet, Severity
 from capsight.rules import Context, _add, _emit, _Group, _unanswered, rule
+from capsight.session_links import claimed
 
 
 def _ints(packet: Packet, name: str) -> list[int]:
@@ -233,6 +234,8 @@ def pfcp_rejects(ctx: Context) -> Iterator[Finding]:
         cause = to_int(tx.answer.first("pfcp.cause"))
         if cause is None or cause < 64:
             continue
+        if claimed(ctx, tx):
+            continue  # session.* explains it with the GTP-C side
         code = lookup(PFCP_CAUSE, cause)
         key = (tx.name, cause)
         if key not in groups:

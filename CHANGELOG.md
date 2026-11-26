@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Session refusals are explained across GTP-C and PFCP instead of as two vague codes. A
+  Create Session is linked to the PFCP Session Establishment its gateway sent the UPF (by
+  time, in arrival order, only when unambiguous). When the UPF refused it, one finding says
+  the gateway's cause (often 72 System failure) only passes on the UPF's refusal. When the
+  UPF also deleted another session on the same UE address (Session Report with "deleted by
+  the UP function"), the finding names the address and the APNs: two APNs sharing one static
+  address knock each other's sessions out, which looks like an intermittent failure.
+
 ## 0.3.0
 
 Operator network coverage: roaming, policy and charging, 2G/3G MAP, ciphered 5G NAS.

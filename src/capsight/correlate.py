@@ -34,6 +34,7 @@ class Transaction:
     answer: Packet | None = None
     imsi: str | None = None
     retransmissions: int = 0
+    resent: float | None = None  # time of the last retransmission while still unanswered
 
     @property
     def first_packet(self) -> Packet:
@@ -69,6 +70,11 @@ TX_FIELDS = frozenset(
         "gtpv2.pdn_type",
         "e212.imsi",
         "pfcp.cause",
+        "pfcp.seid",
+        "pfcp.ue_ip_addr_ipv4",
+        "pfcp.ue_ip_addr_ipv6",
+        "pfcp.network_instance",
+        "pfcp.srreq_flags.psdbu",
     )
 )
 
@@ -203,6 +209,7 @@ class Gtpv2Correlator(Correlator):
             key = (seq, GTPV2_PAIRS[mtype])
             if key in self.open_requests:
                 self.open_requests[key].retransmissions += 1
+                self.open_requests[key].resent = packet.time
                 return
             previous = self.answered.get(key)
             if (
@@ -266,6 +273,7 @@ class PfcpCorrelator(Correlator):
             key = (seq, PFCP_PAIRS[mtype])
             if key in self.open_requests:
                 self.open_requests[key].retransmissions += 1
+                self.open_requests[key].resent = packet.time
                 return
             name = PFCP_MESSAGES.get(mtype, f"type {mtype}").removesuffix(" Request")
             self.open_requests[key] = Transaction("pfcp", name, slim(packet))

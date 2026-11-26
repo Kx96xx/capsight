@@ -23,6 +23,7 @@ from capsight.rules import (
     one_way_commands,
     rule,
 )
+from capsight.session_links import claimed
 
 # Roaming-specific reading of common causes; anything else falls back to the cause table.
 ROAMING_HINT = {
@@ -72,6 +73,8 @@ def s8_rejects(ctx: Context) -> Iterator[Finding]:
                 continue
             if cause == GTP_USER_AUTH_FAILED and _radius_accept_before(ctx, tx.answer):
                 continue  # gtpv2.cause explains a reject after RADIUS accepted the user
+            if claimed(ctx, tx):
+                continue  # session.* explains where the refusal came from
             key = ("reject", cause)
             packets = [p for p in (tx.request, tx.answer) if p]
         info = seen.setdefault(key, {"plmns": set(), "apns": set(), "remote": set()})
