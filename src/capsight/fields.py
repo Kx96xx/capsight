@@ -78,7 +78,16 @@ NAS_5GS = (
     "e212.mnc",
 )
 
-PFCP = ("pfcp.msg_type", "pfcp.seqno", "pfcp.cause", "pfcp.seid")
+PFCP = (
+    "pfcp.msg_type",
+    "pfcp.seqno",
+    "pfcp.cause",
+    "pfcp.seid",
+    "pfcp.ue_ip_addr_ipv4",
+    "pfcp.ue_ip_addr_ipv6",
+    "pfcp.network_instance",
+    "pfcp.srreq_flags.psdbu",
+)
 
 # MAP over TCAP (2G/3G core over SS7/SIGTRAN). Element fields mark which TCAP message and
 # which component a value belongs to; see correlate_map.py.

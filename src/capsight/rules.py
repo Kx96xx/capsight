@@ -23,6 +23,7 @@ from capsight.codes import (
 from capsight.correlate import Transaction, to_bool, to_int
 from capsight.model import Finding, Packet, Severity
 from capsight.roaming import decode_plmn, is_visiting, plmn_text, visited_network
+from capsight.session_links import claimed
 
 MAX_EVIDENCE = 5
 ESM_PDN_CONNECTIVITY_REJECT = 0xD1
@@ -66,6 +67,7 @@ class Context:
     flows: UserPlane = field(default_factory=UserPlane)
     map: list[Transaction] = field(default_factory=list)
     capture_start: float = 0.0
+    cache: dict[str, object] = field(default_factory=dict)  # computed once, shared by rules
 
     def imsi_of(self, packet: Packet) -> str | None:
         return packet.first("e212.imsi") or self.inferred_imsi.get(packet.number)
@@ -335,6 +337,8 @@ def gtpv2_rejects(ctx: Context) -> Iterator[Finding]:
         accept = _radius_accept_before(ctx, tx.answer) if cause == GTP_USER_AUTH_FAILED else None
         if accept is None and visited_network(tx) is not None:
             continue  # roaming.s8 reports it
+        if claimed(ctx, tx):
+            continue  # session.* explains where the refusal came from
         key = (tx.name, cause, source, accept is not None)
         if key not in groups:
             apn = tx.request.first("gtpv2.apn") if tx.request else None

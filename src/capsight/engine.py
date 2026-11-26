@@ -14,6 +14,7 @@ from capsight import (
     rules_map,  # noqa: F401  (registers MAP rules)
     rules_pcc,  # noqa: F401  (registers Gx/Gy rules)
     rules_roaming,  # noqa: F401  (registers roaming rules)
+    rules_session,  # noqa: F401  (registers GTP-C + PFCP session rules)
 )
 from capsight.correlate import DiameterCorrelator, Gtpv2Correlator, PfcpCorrelator
 from capsight.correlate_map import MapCorrelator
