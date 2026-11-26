@@ -62,10 +62,9 @@ security setup is covered by unit tests only: none of these captures has one.
 
 ## Operator failure patterns
 
-The tests in `tests/test_operator_patterns.py` reproduce failure shapes seen in a production
-mobile core. They were derived by reading production traces locally; only the pattern was
-kept (message, cause, what preceded it). The captures are generated from scratch with
-test-network identities, so no production data is in this repository.
+The tests in `tests/test_operator_patterns.py` reproduce failure shapes common in mobile
+cores: the message, the cause and what preceded it. Every capture is generated from scratch
+with test-network identities.
 
 | Pattern | What capsight now reports |
 |---|---|
@@ -76,94 +75,28 @@ test-network identities, so no production data is in this repository.
 | Attach and default bearer succeed, then an extra APN is rejected (ESM #33) | Warning, not failure: data on the default APN works |
 | GTPv2 cause source bit set | Says whether the responder or a node further down the path raised the cause |
 
-## Large-scale run on operator captures (local only)
+## Large captures
 
-capsight was run locally on 93 production captures (Diameter S6a, GTPv2-C, MAP; 1 KB to
-200 MB each, about 500k packets total). The captures and results never left the machine.
-Every capsight count was compared with an independent `tshark` display-filter count.
+Measured on synthetic captures from `scripts/make_large_capture.py` (busy-core S6a and
+GTPv2-C traffic, about 1% of authentications and sessions rejected), so anyone can repeat
+it. Apple M-series laptop, tshark 4.6, `capsight analyze --format json`, peak memory of the
+largest process.
 
-- No crashes or decode errors on any of the 93 files.
-- **Diameter failures**: capsight's grouped counts matched tshark's failed-answer count on
-  every file, except where one frame carries several Diameter messages (SCTP bundling); there
-  capsight counts each message, tshark counts the frame once.
-- **GTPv2-C rejects**: every file tshark flagged was flagged by capsight, and no extra ones.
-  Where the raw count was double, capsight's lower number is correct: those were
-  retransmitted responses (same sequence number), folded into one failure each.
-- **Bug found and fixed**: captures filtered on one host (requests captured, answers not)
-  produced tens of thousands of false "never answered" failures. capsight now detects a
-  one-directional capture and reports one warning instead.
-- **Not yet covered**: these captures had no S1AP/NAS (no EMM/ESM rejects to check). MAP
-  (2G/3G) was not analysed at the time; see the MAP section below (v0.3).
+| Packets | File size | Time | Peak memory | Findings |
+|---|---|---|---|---|
+| 100,000 | 17 MB | 3.4 s | 233 MB | 2 |
+| 1,000,000 | 166 MB | 27 s | 769 MB | 2 |
+| 6,000,000 | 996 MB | 150 s | 4.0 GB | 2 |
 
-## MAP on production STP captures (v0.3, local only)
-
-Two consecutive 5-minute captures from a production STP pair (334k packets, 72k MAP frames,
-both directions of the visited-network and HLR legs), kept local and never committed.
-
-- **Bundled TCAP messages**: 6% of frames carry several TCAP messages (SCTP bundling), and
-  tshark lists their fields side by side. capsight rebuilds each message from the order of
-  transaction IDs, component counts and component kinds. Checked against tshark's nested
-  JSON for every one of the 4,440 multi-message frames: 4,330 split, **0 wrong**; the other
-  110 have two valid readings (a BEGIN plus an END looks like one CONTINUE) and are left
-  unsplit on purpose, without producing false timeouts.
-- **Found**: SendAuthenticationInfo rejected with unknown subscriber (with the diagnostic),
-  operations never answered (in a quarter of them the requester asked again in the same
-  dialogue, so the timeouts are real), dialogue aborts (provider abort with unrecognized
-  transaction ID, MAP user aborts, procedure cancelled), and about 4,000 answers whose
-  request is not in the capture: reported as one warning that the capture holds only part
-  of the traffic.
-- **Bug found and fixed during development**: skipping bundled frames instead of splitting
-  them turned ~1,800 answers into "answer without request".
-- 78 MB / 167k packets in 5.4 s and 254 MB of memory.
+Each run produced two grouped findings (user unknown and unknown APN) with the exact
+expected counts (10,068 and 10,067 at 6M packets), not one finding per packet. capsight
+streams: Diameter, GTPv2-C and PFCP are paired as tshark emits packets and only the fields
+the rules read are kept, so memory grows with the number of signalling procedures, not with
+packets or file size. These captures are a worst case for that: every subscriber is new
+(one million at 6M packets, about three million procedures). Time is dominated by
+tshark's own decode.
 
 ## Wanted
 
 More public captures, especially: roaming rejects, GTPv2 rejections from a real gateway,
 Diameter timeouts, and 5G SA registration. Open an issue with a link.
-
-
-## Large captures (v0.2)
-
-Eight real-world Diameter/S6a captures, 92 MB to 1.1 GB, kept local and never committed.
-Apple M-series laptop, tshark 4.6, `capsight analyze --format json`. All eight completed with
-exit code 0; the largest produced 13 grouped findings (no flood of per-packet findings).
-
-| File size | Packets | Time | Peak memory | Findings |
-|---|---|---|---|---|
-| 92 MB | 201,101 | 6.3 s | 419 MB | 11 |
-| 109 MB | 107,861 | 4.1 s | 660 MB | 0 |
-| 159 MB | 303,026 | 9.6 s | 589 MB | 6 |
-| 398 MB | 802,326 | 27.2 s | 1.3 GB | 12 |
-| 474 MB | 1,184,913 | 32.2 s | 1.5 GB | 10 |
-| 543 MB | 875,453 | 38.8 s | 1.7 GB | 12 |
-| 610 MB | 1,213,392 | 37.7 s | 1.9 GB | 12 |
-| 1.1 GB | 2,398,305 | 83.2 s | 3.3 GB | 13 |
-
-Before this change the 92 MB and 159 MB files peaked at 606 MB and 857 MB (-31%). The saving
-comes from dropping all but the IP addresses of non-core packets and sharing repeated short
-values (IMSIs, hosts, causes) across packets. Time is dominated by tshark's own decode
-(about 5 s of the 6.3 s for the 92 MB file).
-
-### Streaming
-
-capsight now analyzes packets as tshark emits them. Diameter, GTPv2-C and PFCP are paired
-on the fly and only the fields the rules read are kept; user plane is reduced to flow
-counters; only NAS / S1AP / NGAP / RADIUS packets are kept whole. Memory now grows with the
-number of signalling procedures, not with the number of packets.
-
-| File size | Peak memory before | Peak memory streaming | Time streaming |
-|---|---|---|---|
-| 92 MB | 419 MB | 216 MB | 5.6 s |
-| 159 MB | 589 MB | 255 MB | 8.7 s |
-| 398 MB | 1.3 GB | 431 MB | 26.2 s |
-| 474 MB | 1.5 GB | 411 MB | 30.8 s |
-| 543 MB | 1.7 GB | 491 MB | 36.3 s |
-| 610 MB | 1.9 GB | 508 MB | 34.3 s |
-| 1.1 GB | 3.3 GB | 844 MB | 76.1 s |
-
-Parity: 476 captures (17 public plus 459 local real-world captures, a few KB to 1.1 GB) were
-run through the previous version and the streaming version, comparing packet counts, protocol
-counts, transaction counts and every finding (rule, severity, verdict, count, evidence
-packets, subscribers). All 476 were identical. (5 more files in the set were macOS `._*`
-metadata files, not captures; both versions reject them with tshark's "isn't a capture file"
-error.)

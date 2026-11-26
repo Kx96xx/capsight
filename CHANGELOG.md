@@ -39,8 +39,8 @@ First release on PyPI. Usable on real captures.
 
 - `--imsi X`: one subscriber's attach, authentication, session and data steps in order, and
   where it stopped.
-- Large captures: streaming analysis; a 1.1 GB capture runs in about 780 MB of memory.
-  Same findings as 0.1 on 476 real and 17 public captures.
+- Large captures: streaming analysis, so memory grows with open procedures, not packets.
+  Same findings as 0.1 on every capture in the local regression corpus.
 - `--summary`: top problems with counts, first/last time and subscribers affected, the most
   affected subscribers, and problems over time.
 - `--redact` / `--redact-all`: mask IMSI, MSISDN, IP addresses, hosts/realms and the capture
