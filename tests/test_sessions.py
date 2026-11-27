@@ -191,3 +191,33 @@ def test_roaming_requests_are_counted(tmp_path):
     f = by_rule(core.write(tmp_path))["session.upf_reject"]
     assert "1 of them came over S8 from visited network MCC 001 MNC 02." in f.why
     assert "roaming.s8" not in by_rule(core.write(tmp_path))
+
+
+def test_most_likely_cause_is_the_chain_not_the_loudest_symptom(tmp_path):
+    """Four unanswered Create Sessions come first and outnumber the conflict (3), but the
+    conflict explains its failures, so it is the cause to read first."""
+    from capsight.cli import render_text
+    from capsight.rules import most_likely_cause
+
+    core = Core()
+    for i in range(4):
+        core.create_session(1_699_999_900.0 + i, "c.apn", answer=False, ue_ip=bytes([10, 45, 0, 9]))
+    ping_pong(core)
+    report = analyze(core.write(tmp_path))
+    assert {"gtpv2.unanswered", "session.address_conflict"} <= {f.rule_id for f in report.findings}
+    assert report.findings[0].rule_id == "gtpv2.unanswered"  # the list itself is unchanged
+    assert most_likely_cause(report.findings).rule_id == "session.address_conflict"
+    text = render_text(report)
+    head = text.split("\n\n")[1].splitlines()
+    assert head[0].startswith("MOST LIKELY CAUSE (seen 3 times; 2 problems in total")
+    assert head[1] == "  Two PDN sessions (APNs a.apn and b.apn) share UE address 10.45.0.5: " + (
+        "each new one is refused and the other is deleted."
+    )
+
+
+def test_no_most_likely_block_for_a_single_problem(tmp_path):
+    from capsight.cli import render_text
+
+    core = Core()
+    ping_pong(core)
+    assert "MOST LIKELY CAUSE" not in render_text(analyze(core.write(tmp_path)))

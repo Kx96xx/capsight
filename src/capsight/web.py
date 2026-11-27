@@ -27,8 +27,8 @@ SAMPLES = Path(
 )
 
 INTRO = """# capsight
-Drop in a 4G/5G packet capture (`.pcap` / `.pcapng`, up to 20 MB) and get a plain-English
-diagnosis of why a device couldn't attach, register or get data.
+Drop in a mobile-core packet capture (4G, 5G, SS7; `.pcap` / `.pcapng`, up to 20 MB) and get
+a plain-English diagnosis of why a device couldn't attach, register, roam or get data.
 
 The file is analyzed and deleted right away; nothing is stored. Do not upload captures with
 real subscriber data to a public demo: run capsight locally for those.

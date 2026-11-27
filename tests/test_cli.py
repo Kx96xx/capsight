@@ -17,6 +17,7 @@ def test_analyze_json(plain_udp_capture, capsys):
     assert out["packets"] == 3
     assert out["core_protocols"] == {}
     assert out["findings"] == []
+    assert out["most_likely_cause"] is None
 
 
 @needs_tshark

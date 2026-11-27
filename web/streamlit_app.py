@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from capsight.cli import render_text
 from capsight.redact import Redactor
+from capsight.rules import most_likely_cause
 from capsight.summary import build_summary
 from capsight.web import ALLOWED, MAX_BYTES, analyze_upload
 
@@ -110,11 +111,12 @@ def hero() -> None:
         f"""
 <div class="cs-hero">
   <h1>📡 capsight</h1>
-  <p>Drop in a 4G/5G packet capture and get a plain-English diagnosis of why a device
-  couldn't attach, register or get data.</p>
+  <p>Drop in a mobile-core packet capture (4G, 5G, SS7) and get a plain-English
+  diagnosis of why a device couldn't attach, register, roam or get data.</p>
   <div class="cs-chips">
-    <span>Diameter S6a</span><span>GTPv2-C</span><span>EPS NAS</span><span>RADIUS</span>
-    <span>NGAP</span><span>5G NAS</span><span>PFCP</span><span>GTP-U</span>
+    <span>Diameter S6a/Gx/Gy</span><span>GTPv2-C</span><span>PFCP</span><span>EPS NAS</span>
+    <span>S1AP</span><span>NGAP</span><span>5G NAS</span><span>MAP</span><span>RADIUS</span>
+    <span>GTP-U</span>
   </div>
   <p style="margin:8px 0 0;font-size:.9rem">Open source · runs on tshark ·
   <a href="{REPO}">GitHub ↗</a></p>
@@ -170,14 +172,14 @@ def verdict_banner(report) -> None:
             "info",
             "No mobile-core signalling found",
             (
-                "capsight reads Diameter, GTP, NAS, S1AP/NGAP, PFCP and RADIUS. "
+                "capsight reads Diameter, GTP, NAS, S1AP/NGAP, PFCP, MAP and RADIUS. "
                 "Check the capture point and filter."
             ),
         )
     elif fails:
         sev = "failure"
         title = f"{len(fails) + len(warns)} problems found"
-        sub = f"Most important: {fails[0].verdict}"
+        sub = f"Most likely cause: {most_likely_cause(report.findings).verdict}"
     elif warns:
         sev, title, sub = "warning", f"{len(warns)} warnings", "No hard failure, but worth a look."
     else:
@@ -244,7 +246,7 @@ def overview(report) -> None:
 
 def main() -> None:
     st.set_page_config(
-        page_title="capsight · 4G/5G capture diagnosis", page_icon="📡", layout="centered"
+        page_title="capsight · mobile-core capture diagnosis", page_icon="📡", layout="centered"
     )
     st.markdown(CSS, unsafe_allow_html=True)
     hero()
@@ -322,9 +324,14 @@ def main() -> None:
     stats(report, redactor)
     verdict_banner(report)
 
+    first = most_likely_cause(report.findings)
     ordered = sorted(
         report.findings,
-        key=lambda f: ({"failure": 0, "warning": 1}.get(str(f.severity), 2), -f.count),
+        key=lambda f: (
+            f is not first,
+            {"failure": 0, "warning": 1}.get(str(f.severity), 2),
+            -f.count,
+        ),
     )
     for f in ordered:
         finding_card(f)

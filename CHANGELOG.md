@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The report opens with the most likely cause when there is more than one problem: chains
+  that join messages rank above a single refusal code, which ranks above timeouts and aborts,
+  then the more frequent wins. In text, `--summary`, JSON (`most_likely_cause`) and the web
+  demo, whose header now lists MAP and Gx/Gy too.
 - Session refusals are explained across GTP-C and PFCP instead of as two vague codes. A
   Create Session is linked to the PFCP Session Establishment its gateway sent the UPF (by
   time, in arrival order, only when unambiguous). When the UPF refused it, one finding says

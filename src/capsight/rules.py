@@ -526,6 +526,42 @@ SUPERSEDES: dict[str, tuple[str, ...]] = {
     "gtpv2.pdn_type": ("gtpv2.cause", "roaming.s8"),
 }
 
+# How much a rule's finding says about the cause, for "most likely cause". A chain that joins
+# messages (across protocols or procedures) names the cause; a refusal code names what the
+# refusing node decided; a timeout, an abort or one-way traffic is only a symptom.
+CAUSE, DECISION, SYMPTOM = 2, 1, 0
+SPECIFICITY: dict[str, int] = {
+    "session.address_conflict": CAUSE,
+    "session.upf_reject": CAUSE,
+    "gtpv2.pdn_type": CAUSE,
+    "diameter.result": DECISION,
+    "pcc.result": DECISION,
+    "pcc.credit": DECISION,
+    "pcc.rule": DECISION,
+    "nas.emm.reject": DECISION,
+    "nas.esm.reject": DECISION,
+    "nas5g.mm.reject": DECISION,
+    "nas5g.sm.reject": DECISION,
+    "ngap.failure": DECISION,
+    "map.error": DECISION,
+    "roaming.s8": DECISION,
+    "gtpv2.cause": DECISION,
+    "pfcp.cause": DECISION,
+}  # every other rule: SYMPTOM
+
+
+def most_likely_cause(findings: list[Finding]) -> Finding | None:
+    """The finding to read first: the most specific failure, then the most frequent.
+
+    Warnings count only when there is no failure. None when nothing went wrong.
+    """
+    problems = [f for f in findings if f.severity == Severity.FAILURE] or [
+        f for f in findings if f.severity == Severity.WARNING
+    ]
+    if not problems:
+        return None
+    return max(problems, key=lambda f: (SPECIFICITY.get(f.rule_id, SYMPTOM), f.count))
+
 
 def _drop_superseded(findings: list[Finding]) -> list[Finding]:
     covered: dict[str, set[int]] = {}

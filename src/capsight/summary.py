@@ -10,6 +10,7 @@ from collections import Counter
 from datetime import UTC, datetime
 
 from capsight.engine import Report
+from capsight.rules import most_likely_cause
 
 TOP_PROBLEMS = 10
 TOP_SUBSCRIBERS = 10
@@ -36,8 +37,12 @@ def build_summary(report: Report) -> dict:
     timeline: Counter[int] = Counter()
     for minute, n in minutes.items():
         timeline[minute - minute % (bucket * 60)] += n
+    cause = most_likely_cause(report.findings)
     return {
         "problems": len(problems),
+        "most_likely_cause": None
+        if cause is None
+        else {"rule_id": cause.rule_id, "verdict": cause.verdict, "count": cause.count},
         "occurrences": sum(f.count for f in problems),
         "subscribers_affected": len(subscribers),
         "top_problems": [
@@ -91,6 +96,9 @@ def render_summary(summary: dict) -> list[str]:
         f"{summary['subscribers_affected']:,} "
         f"subscriber{'s' if summary['subscribers_affected'] != 1 else ''} affected"
     )
+    cause = summary.get("most_likely_cause")
+    if cause and summary["problems"] > 1:
+        lines += ["", "MOST LIKELY CAUSE", f"  {cause['verdict']}"]
     lines += ["", "TOP PROBLEMS"]
     for i, p in enumerate(summary["top_problems"], 1):
         when = p["first"][11:] if p["first"] else "?"

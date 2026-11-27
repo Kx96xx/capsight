@@ -39,6 +39,8 @@ def busy_capture():
 
 def test_summary_counts_and_order():
     s = build_summary(busy_capture())
+    assert s["most_likely_cause"]["count"] == 150
+    assert s["most_likely_cause"]["rule_id"] == "nas.emm.reject"
     assert s["problems"] == 2
     assert s["occurrences"] == 154
     assert s["subscribers_affected"] == 4
@@ -74,6 +76,7 @@ def test_text_render_and_hint():
     assert "TOP PROBLEMS" in text and "MOST AFFECTED SUBSCRIBERS" in text
     assert "OVER TIME (UTC, per 1 min)" in text
     assert "001010000000001       100x" in text
+    assert text.index("MOST LIKELY CAUSE") < text.index("TOP PROBLEMS")
 
 
 def test_long_capture_uses_bigger_buckets():
