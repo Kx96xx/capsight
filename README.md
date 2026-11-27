@@ -1,6 +1,6 @@
 # capsight
 
-**Drop in a 4G/5G packet capture, get a plain-English diagnosis of why a device couldn't attach, register or get data.**
+**Drop in a mobile-core packet capture (4G, 5G, SS7), get a plain-English diagnosis of why a device couldn't attach, register, roam or get data.**
 
 > Status: early development, v0.2. 4G core (Diameter S6a, GTPv2-C, EPS NAS, RADIUS) and 5G SA (NGAP, 5G NAS, PFCP, GTP-U) work today. See [docs/PLAN.md](https://github.com/Kx96xx/capsight/blob/main/docs/PLAN.md).
 
@@ -117,6 +117,13 @@ If the IMSI is not in the capture, capsight lists the subscribers it did find. T
 be written as `001010000000001` or `imsi-001010000000001`. In 5G the subscriber is known only
 when the SUCI is not concealed.
 
+### Most likely cause
+
+When a capture has more than one problem, the report opens with the one to read first.
+Findings that join messages (a Create Session refused because the UPF refused it, two APNs
+sharing one address) rank above a single refusal code, which ranks above timeouts and
+aborts; the more frequent wins a tie. `--format json` has it as `most_likely_cause`.
+
 ### Busy captures: --summary
 
 On a capture with thousands of failures, `--summary` gives the shape of the problem in one
@@ -127,6 +134,9 @@ the most affected subscribers, and problems over time:
 $ capsight analyze hss-5min.pcapng --summary
 
 summary   11 problems, 32,185 occurrences, 7,553 subscribers affected
+
+MOST LIKELY CAUSE
+  AIR rejected: DIAMETER_ERROR_USER_UNKNOWN.
 
 TOP PROBLEMS
    1. FAILURE    28,384x  AIR rejected: DIAMETER_ERROR_USER_UNKNOWN.

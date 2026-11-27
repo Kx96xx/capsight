@@ -12,6 +12,7 @@ from capsight import __version__
 from capsight.decode import TsharkError
 from capsight.engine import Report, analyze
 from capsight.redact import Redactor
+from capsight.rules import most_likely_cause
 from capsight.summary import build_summary, render_summary
 
 SUMMARY_HINT_OCCURRENCES = 100
@@ -40,6 +41,7 @@ def render_text(report: Report, summary: dict | None = None) -> str:
     problems = [f for f in report.findings if f.severity != "info"]
     if not problems:
         lines += ["", "No known failure patterns found."]
+    lines += render_most_likely(report)
     if not report.findings:
         return "\n".join(lines)
     for finding in report.findings:
@@ -57,6 +59,27 @@ def render_text(report: Report, summary: dict | None = None) -> str:
     if sum(f.count for f in problems) >= SUMMARY_HINT_OCCURRENCES:
         lines += ["", "tip: add --summary for top problems, most affected subscribers and timing."]
     return "\n".join(lines)
+
+
+def render_most_likely(report: Report) -> list[str]:
+    """The finding to read first, when there are several problems to choose from."""
+    problems = [f for f in report.findings if f.severity != "info"]
+    cause = most_likely_cause(report.findings)
+    if cause is None or len(problems) < 2:
+        return []
+    seen = f"seen {cause.count:,} times" if cause.count > 1 else "seen once"
+    return [
+        "",
+        f"MOST LIKELY CAUSE ({seen}; {len(problems)} problems in total, all listed below)",
+        f"  {cause.verdict}",
+    ]
+
+
+def most_likely_doc(report: Report) -> dict | None:
+    cause = most_likely_cause(report.findings)
+    if cause is None:
+        return None
+    return {"rule_id": cause.rule_id, "verdict": cause.verdict, "count": cause.count}
 
 
 STATUS_MARK = {"ok": "ok", "failed": "FAILED", "no answer": "NO ANSWER", "info": "note"}
@@ -146,6 +169,7 @@ def main(argv: list[str] | None = None) -> int:
         report.capture = "capture" + Path(report.capture).suffix
     if args.format == "json":
         doc = asdict(report)
+        doc["most_likely_cause"] = most_likely_doc(report)
         if summary is not None:
             doc["summary"] = summary
         if redactor is not None:
