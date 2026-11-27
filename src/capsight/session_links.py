@@ -17,6 +17,12 @@ Session Establishment is linked to a Create Session when it is the only one insi
 Create Session's request-to-answer window and that window is the only one containing it.
 Anything ambiguous stays unlinked, and the plain per-message rules report it.
 
+The same holds for policy and charging: before it answers Create Session the gateway asks the
+PCRF (Gx) and the online charging system (Gy) with a CCR-I. When one of them refuses, the
+gateway's cause again only passes the refusal on. A failed CCR-I is linked to a rejected
+Create Session when it is the only failed CCR-I inside that request-to-answer window (for
+the same IMSI when both carry one) and that window is the only one containing it.
+
 Rules use :func:`links`, which computes everything once per analysis (cached on the context).
 """
 
@@ -99,6 +105,9 @@ class Links:
     conflicts: list[Conflict] = field(default_factory=list)
     claimed_gtp: set[int] = field(default_factory=set)  # GTP request numbers explained here
     claimed_pfcp: set[int] = field(default_factory=set)  # PFCP request numbers explained here
+    # (rejected Create Session, the failed Gx/Gy CCR-I behind it)
+    policy_rejects: list[tuple[Transaction, Transaction]] = field(default_factory=list)
+    claimed_diameter: set[int] = field(default_factory=set)  # CCR request numbers explained
 
     def upf_rejects(self, gtpv2: list[Transaction]) -> list[tuple[Transaction, Transaction]]:
         """Rejected Create Sessions whose linked PFCP establishment the UPF rejected."""
@@ -204,6 +213,50 @@ def _conflicts(pfcp: list[Transaction], links: Links) -> None:
             break
 
 
+def _same_subscriber(a: Transaction, b: Transaction) -> bool:
+    return a.imsi is None or b.imsi is None or a.imsi == b.imsi
+
+
+def _link_policy(gtpv2: list[Transaction], diameter: list[Transaction], links: Links) -> None:
+    # rules and rules_pcc import this module; import them here to avoid a cycle
+    from capsight.codes_pcc import CC_INITIAL
+    from capsight.rules import is_pcc
+    from capsight.rules_pcc import _result, interface, request_type
+
+    explained = {g.request.number for g, _ in links.upf_rejects(gtpv2)}
+    explained |= {c.new_gtp.request.number for c in links.conflicts if c.new_gtp is not None}
+    sessions = [
+        g
+        for g in _complete(gtpv2, CREATE_SESSION)
+        if gtp_rejected(g) and g.request.number not in explained
+    ]
+    failed = [
+        d
+        for d in diameter
+        if d.name == "CCR"
+        and d.request is not None
+        and d.answer is not None
+        and is_pcc(d)
+        and request_type(d) == CC_INITIAL
+        and _result(d.answer, interface(d)) is not None
+    ]
+
+    def inside(g: Transaction, d: Transaction) -> bool:
+        return (
+            _start(g) <= d.request.time
+            and d.answer.time <= g.answer.time
+            and _same_subscriber(g, d)
+        )
+
+    for g in sessions:
+        found = [d for d in failed if inside(g, d)]
+        if len(found) != 1:
+            continue
+        d = found[0]
+        if sum(1 for other in sessions if inside(other, d)) == 1:
+            links.policy_rejects.append((g, d))
+
+
 def links(ctx: Any) -> Links:
     """Links for this analysis; `ctx` is a rules.Context (needs gtpv2, pfcp, cache)."""
     cached = ctx.cache.get("session_links")
@@ -219,6 +272,10 @@ def links(ctx: Any) -> Links:
     for g, p in result.upf_rejects(ctx.gtpv2):
         result.claimed_gtp.add(g.request.number)
         result.claimed_pfcp.add(p.request.number)
+    _link_policy(ctx.gtpv2, ctx.diameter, result)
+    for g, d in result.policy_rejects:
+        result.claimed_gtp.add(g.request.number)
+        result.claimed_diameter.add(d.request.number)
     ctx.cache["session_links"] = result
     return result
 
@@ -228,5 +285,9 @@ def claimed(ctx: Any, tx: Transaction) -> bool:
     if tx.request is None or not (ctx.gtpv2 or ctx.pfcp):
         return False
     lk = links(ctx)
-    pool = lk.claimed_gtp if tx.protocol == "gtpv2" else lk.claimed_pfcp
+    pool = {
+        "gtpv2": lk.claimed_gtp,
+        "pfcp": lk.claimed_pfcp,
+        "diameter": lk.claimed_diameter,
+    }.get(tx.protocol, set())
     return tx.request.number in pool

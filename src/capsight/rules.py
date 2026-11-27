@@ -533,6 +533,7 @@ CAUSE, DECISION, SYMPTOM = 2, 1, 0
 SPECIFICITY: dict[str, int] = {
     "session.address_conflict": CAUSE,
     "session.upf_reject": CAUSE,
+    "session.policy_reject": CAUSE,
     "gtpv2.pdn_type": CAUSE,
     "diameter.result": DECISION,
     "pcc.result": DECISION,

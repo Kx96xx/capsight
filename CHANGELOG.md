@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- A Create Session refused because the PCRF (Gx) or the online charging system (Gy) refused
+  the gateway's CCR-I is one finding that names the refusing server and its result, instead
+  of a "system failure" plus a separate Gx/Gy reject. The CCR-I is linked only when it is the
+  only failed one inside that Create Session's request-to-answer window (same IMSI when both
+  carry one) and no other rejected Create Session overlaps it.
 - The report opens with the most likely cause when there is more than one problem: chains
   that join messages rank above a single refusal code, which ranks above timeouts and aborts,
   then the more frequent wins. In text, `--summary`, JSON (`most_likely_cause`) and the web

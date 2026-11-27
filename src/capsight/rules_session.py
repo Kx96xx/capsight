@@ -1,6 +1,7 @@
-"""Session rules across GTP-C and PFCP: why the gateway refused a session.
+"""Session rules across GTP-C, PFCP and Gx/Gy: why the gateway refused a session.
 
-See session_links.py for how a Create Session is tied to the PFCP exchange behind it.
+See session_links.py for how a Create Session is tied to the PFCP exchange or the policy and
+charging request behind it.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from capsight.correlate import Transaction, to_int
 from capsight.model import Finding, Packet, Severity
 from capsight.roaming import visited_network
 from capsight.rules import Context, _add, _emit, _Group, rule
+from capsight.rules_pcc import _result, interface, label
 from capsight.rules_roaming import _networks
 from capsight.session_links import Conflict, links, network_instance, pfcp_cause
 
@@ -176,3 +178,48 @@ def upf_reject(ctx: Context) -> Iterator[Finding]:
     for key, group in groups.items():
         group.why += _roaming_note(sessions[key])
     yield from _emit("session.upf_reject", groups)
+
+
+# Who refused, and what the gateway had asked for, by interface.
+REFUSER = {
+    "Gx": ("PCRF", "the policy request"),
+    "Gy": ("online charging system (OCS)", "the credit request"),
+}
+
+
+@rule("session.policy_reject")
+def policy_reject(ctx: Context) -> Iterator[Finding]:
+    groups: dict[object, _Group] = {}
+    sessions: dict[object, list[Transaction]] = {}
+    for g, d in links(ctx).policy_rejects:
+        name = interface(d)
+        failed = _result(d.answer, name)
+        if failed is None:
+            continue
+        value, kind, code = failed
+        gcause = to_int(g.answer.first("gtpv2.cause")) if g.answer else None
+        key = (name, value, gcause)
+        if key not in groups:
+            server, asked = REFUSER.get(name, ("Diameter server", "the request"))
+            why = (
+                f"Before answering Create Session the gateway sent {label(d)} to the {server}, "
+                f"which answered with {kind} {value} ({code.name})"
+            )
+            apn = _apn(g) or (d.request.first("diameter.Called-Station-Id") if d.request else None)
+            why += f" for APN {apn}." if apn else "."
+            why += (
+                f" The gateway then answered Create Session with cause {_gtp_cause(g)}, which "
+                "only passes on that refusal."
+            )
+            groups[key] = _Group(
+                verdict=f"Create Session refused because the {server} refused {asked}: "
+                f"{code.name}.",
+                why=why,
+                fix=f"Look at the {server}, not the gateway: {code.hint}",
+                severity=Severity.FAILURE,
+            )
+        _add(groups[key], _packets(d.request, d.answer, g.answer), g.imsi or d.imsi)
+        sessions.setdefault(key, []).append(g)
+    for key, group in groups.items():
+        group.why += _roaming_note(sessions[key])
+    yield from _emit("session.policy_reject", groups)
