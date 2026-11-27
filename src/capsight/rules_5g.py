@@ -259,6 +259,7 @@ def pfcp_unanswered(ctx: Context) -> Iterator[Finding]:
         "pfcp.unanswered",
         "The UPF (or SMF) did not answer. Check that the PFCP association is up, the peer is "
         "reachable on UDP 8805, and its health.",
+        claimed=lambda tx: claimed(ctx, tx),
     )
 
 
