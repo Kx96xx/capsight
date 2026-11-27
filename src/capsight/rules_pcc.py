@@ -28,6 +28,7 @@ from capsight.codes_pcc import (
 from capsight.correlate import Transaction, to_int
 from capsight.model import Finding, Packet, Severity
 from capsight.rules import Context, _add, _emit, _Group, application_of, is_pcc, rule
+from capsight.session_links import claimed
 
 GTP_LINK_WINDOW_S = 5.0
 CREATE_SESSION = "Create Session Request"
@@ -93,7 +94,7 @@ def _apn(tx: Transaction) -> str | None:
 def pcc_rejects(ctx: Context) -> Iterator[Finding]:
     groups: dict[object, _Group] = {}
     for tx in ctx.diameter:
-        if tx.answer is None or not is_pcc(tx):
+        if tx.answer is None or not is_pcc(tx) or claimed(ctx, tx):
             continue
         name = interface(tx)
         failed = _result(tx.answer, name)
