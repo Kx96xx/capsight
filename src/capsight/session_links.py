@@ -23,6 +23,11 @@ gateway's cause again only passes the refusal on. A failed CCR-I is linked to a 
 Create Session when it is the only failed CCR-I inside that request-to-answer window (for
 the same IMSI when both carry one) and that window is the only one containing it.
 
+When the upstream request is never answered at all, the gateway gives up and rejects the
+Create Session with a generic cause. An unanswered PFCP Session Establishment or Gx/Gy CCR-I
+is linked to a rejected Create Session under the same rule: it is the only unanswered
+upstream request sent inside that window, and that window is the only one containing it.
+
 Rules use :func:`links`, which computes everything once per analysis (cached on the context).
 """
 
@@ -108,6 +113,8 @@ class Links:
     # (rejected Create Session, the failed Gx/Gy CCR-I behind it)
     policy_rejects: list[tuple[Transaction, Transaction]] = field(default_factory=list)
     claimed_diameter: set[int] = field(default_factory=set)  # CCR request numbers explained
+    # (rejected Create Session, the unanswered PFCP establishment or Gx/Gy CCR-I behind it)
+    upstream_timeouts: list[tuple[Transaction, Transaction]] = field(default_factory=list)
 
     def upf_rejects(self, gtpv2: list[Transaction]) -> list[tuple[Transaction, Transaction]]:
         """Rejected Create Sessions whose linked PFCP establishment the UPF rejected."""
@@ -257,6 +264,50 @@ def _link_policy(gtpv2: list[Transaction], diameter: list[Transaction], links: L
             links.policy_rejects.append((g, d))
 
 
+def _link_timeouts(
+    gtpv2: list[Transaction],
+    pfcp: list[Transaction],
+    diameter: list[Transaction],
+    links: Links,
+) -> None:
+    from capsight.codes_pcc import CC_INITIAL
+    from capsight.rules import is_pcc
+    from capsight.rules_pcc import request_type
+
+    explained = {g.request.number for g, _ in links.upf_rejects(gtpv2)}
+    explained |= {c.new_gtp.request.number for c in links.conflicts if c.new_gtp is not None}
+    explained |= {g.request.number for g, _ in links.policy_rejects}
+    sessions = [
+        g
+        for g in _complete(gtpv2, CREATE_SESSION)
+        if gtp_rejected(g) and g.request.number not in explained
+    ]
+    unanswered = [
+        t
+        for t in pfcp
+        if t.name == PFCP_ESTABLISHMENT and t.request is not None and t.answer is None
+    ] + [
+        t
+        for t in diameter
+        if t.name == "CCR"
+        and t.request is not None
+        and t.answer is None
+        and is_pcc(t)
+        and request_type(t) == CC_INITIAL
+    ]
+
+    def inside(g: Transaction, u: Transaction) -> bool:
+        return _start(g) <= u.request.time <= g.answer.time and _same_subscriber(g, u)
+
+    for g in sessions:
+        found = [u for u in unanswered if inside(g, u)]
+        if len(found) != 1:
+            continue
+        u = found[0]
+        if sum(1 for other in sessions if inside(other, u)) == 1:
+            links.upstream_timeouts.append((g, u))
+
+
 def links(ctx: Any) -> Links:
     """Links for this analysis; `ctx` is a rules.Context (needs gtpv2, pfcp, cache)."""
     cached = ctx.cache.get("session_links")
@@ -276,6 +327,11 @@ def links(ctx: Any) -> Links:
     for g, d in result.policy_rejects:
         result.claimed_gtp.add(g.request.number)
         result.claimed_diameter.add(d.request.number)
+    _link_timeouts(ctx.gtpv2, ctx.pfcp, ctx.diameter, result)
+    for g, u in result.upstream_timeouts:
+        result.claimed_gtp.add(g.request.number)
+        pool = result.claimed_pfcp if u.protocol == "pfcp" else result.claimed_diameter
+        pool.add(u.request.number)
     ctx.cache["session_links"] = result
     return result
 

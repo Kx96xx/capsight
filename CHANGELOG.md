@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- A Create Session refused because the gateway's own upstream request was never answered
+  (PFCP Session Establishment to the UPF, or Gx/Gy CCR-I to the PCRF/OCS) is one finding
+  that names the silent server, how often the request was sent and how long the gateway
+  waited, instead of a generic cause plus a separate timeout. Linked under the same
+  unambiguous-window rule; the gateway's reject proves it gave up, so a timeout near the end
+  of the capture is counted too.
 - A Create Session refused because the PCRF (Gx) or the online charging system (Gy) refused
   the gateway's CCR-I is one finding that names the refusing server and its result, instead
   of a "system failure" plus a separate Gx/Gy reject. The CCR-I is linked only when it is the

@@ -223,3 +223,51 @@ def policy_reject(ctx: Context) -> Iterator[Finding]:
     for key, group in groups.items():
         group.why += _roaming_note(sessions[key])
     yield from _emit("session.policy_reject", groups)
+
+
+# Who did not answer, by the upstream request's protocol / Diameter interface.
+SILENT = {"pfcp": "UPF", "Gx": "PCRF", "Gy": "online charging system (OCS)"}
+
+
+@rule("session.upstream_timeout")
+def upstream_timeout(ctx: Context) -> Iterator[Finding]:
+    groups: dict[object, _Group] = {}
+    sessions: dict[object, list[Transaction]] = {}
+    for g, u in links(ctx).upstream_timeouts:
+        if u.protocol == "pfcp":
+            server, asked = SILENT["pfcp"], "PFCP Session Establishment"
+        else:
+            server = SILENT.get(interface(u), "Diameter server")
+            asked = label(u)
+        gcause = to_int(g.answer.first("gtpv2.cause")) if g.answer else None
+        key = (server, gcause)
+        if key not in groups:
+            waited = g.answer.time - u.request.time
+            tries = f", sent {u.retransmissions + 1} times" if u.retransmissions else ""
+            why = (
+                f"Before answering Create Session the gateway sent {asked} to the {server}"
+                f"{tries}, and got no answer. After {waited:.1f} s it answered Create Session "
+                f"with cause {_gtp_cause(g)}, which only says it gave up waiting."
+            )
+            apn = _apn(g)
+            if apn:
+                why = why.replace("answered Create Session with", f"rejected APN {apn} with", 1)
+            groups[key] = _Group(
+                verdict=f"Create Session refused because the {server} did not answer the gateway.",
+                why=why,
+                fix=(
+                    f"Look at the {server}, not the gateway: check that it is up and "
+                    "reachable from the gateway"
+                    + (
+                        " and that the PFCP association is established."
+                        if server == "UPF"
+                        else " and that the Diameter connection to it is up."
+                    )
+                ),
+                severity=Severity.FAILURE,
+            )
+        _add(groups[key], _packets(u.request, g.answer), g.imsi or u.imsi)
+        sessions.setdefault(key, []).append(g)
+    for key, group in groups.items():
+        group.why += _roaming_note(sessions[key])
+    yield from _emit("session.upstream_timeout", groups)

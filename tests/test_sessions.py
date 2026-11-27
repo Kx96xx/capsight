@@ -54,6 +54,7 @@ class Core:
         answer: bool = True,
         ue_ip: bytes = UE_IP,
         visited: str | None = None,
+        upf_silent: bool = False,
     ) -> int:
         """One Create Session; returns the session's CP SEID. `deletes`: SEID the UPF drops."""
         self.gtp_seq += 1
@@ -65,6 +66,12 @@ class Core:
         self.frames.append((t, gtpv2_frame(True, gtpv2(CS_REQ, self.gtp_seq, ies))))
         est = pfcp(EST_REQ, seq, seid=0, ies=[pfcp_fseid(self.seid), pfcp_create_pdr(ue_ip)])
         self.frames.append((t + 0.05, pfcp_frame(True, est)))
+        if upf_silent:  # sent three times, never answered; the gateway gives up after 3 s
+            self.frames.append((t + 1.05, pfcp_frame(True, est)))
+            self.frames.append((t + 2.05, pfcp_frame(True, est)))
+            response = gtpv2(CS_RESP, self.gtp_seq, [ie_cause(SYSTEM_FAILURE_GTP)], teid=0x1234)
+            self.frames.append((t + 3.06, gtpv2_frame(False, response)))
+            return self.seid
         self.frames.append(
             (t + 0.0510, pfcp_frame(False, pfcp(EST_RESP, seq, self.seid, upf_cause)))
         )
@@ -221,3 +228,36 @@ def test_no_most_likely_block_for_a_single_problem(tmp_path):
     core = Core()
     ping_pong(core)
     assert "MOST LIKELY CAUSE" not in render_text(analyze(core.write(tmp_path)))
+
+
+def test_upf_not_answering_explains_the_reject(tmp_path):
+    core = Core()
+    t = 1_700_000_000.0
+    core.create_session(t, "a.apn")
+    core.create_session(t + 10, "a.apn", upf_silent=True)
+    core.create_session(t + 20, "a.apn", upf_silent=True)
+    found = by_rule(core.write(tmp_path))
+    f = found["session.upstream_timeout"]
+    assert f.verdict == "Create Session refused because the UPF did not answer the gateway."
+    assert "sent PFCP Session Establishment to the UPF, sent 3 times, and got no answer" in f.why
+    assert "After 3.0 s it rejected APN a.apn with cause 72 (System failure)" in f.why
+    assert f.count == 2 and f.subscribers == (IMSI,)
+    assert "PFCP association" in f.fix
+    # the timeout and the gateway's code are not reported again on their own
+    assert not {"pfcp.unanswered", "gtpv2.cause"} & set(found)
+
+
+def test_unanswered_request_in_two_windows_is_not_linked(tmp_path):
+    core = Core()
+    t = 1_700_000_000.0
+    core.create_session(t, "a.apn", upf_silent=True)
+    # a second rejected Create Session whose window also covers the unanswered establishment
+    core.gtp_seq += 1
+    req = gtpv2(CS_REQ, core.gtp_seq, [ie_imsi(IMSI), ie_apn("b.apn")])
+    core.frames.append((t + 0.01, gtpv2_frame(True, req)))
+    resp = gtpv2(CS_RESP, core.gtp_seq, [ie_cause(SYSTEM_FAILURE_GTP)], teid=0x1234)
+    core.frames.append((t + 3.1, gtpv2_frame(False, resp)))
+    core.create_session(t + 20, "a.apn")  # keeps the capture going past the PFCP timeout
+    found = by_rule(core.write(tmp_path))
+    assert "session.upstream_timeout" not in found
+    assert {"pfcp.unanswered", "gtpv2.cause"} <= set(found)

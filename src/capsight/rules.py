@@ -295,6 +295,7 @@ def diameter_unanswered(ctx: Context) -> Iterator[Finding]:
         "diameter.unanswered",
         "The peer or a routing agent dropped the request. Check the Diameter connection "
         "state and routing for the destination realm.",
+        claimed=lambda tx: claimed(ctx, tx),
     )
 
 
@@ -534,6 +535,7 @@ SPECIFICITY: dict[str, int] = {
     "session.address_conflict": CAUSE,
     "session.upf_reject": CAUSE,
     "session.policy_reject": CAUSE,
+    "session.upstream_timeout": CAUSE,
     "gtpv2.pdn_type": CAUSE,
     "diameter.result": DECISION,
     "pcc.result": DECISION,

@@ -123,6 +123,24 @@ def test_ambiguous_policy_reject_is_not_linked(tmp_path):
     assert not [f for f in report.findings if f.rule_id == "diameter.result"]
 
 
+def test_pcrf_not_answering_explains_the_gtp_reject(tmp_path):
+    cap = _write(
+        tmp_path,
+        "gx-silent.pcap",
+        [(True, ccr(0x24, app=GX_APP))],
+        [
+            *_create_session(14, 72, end=T0 + 3.0),
+            *_create_session(15, 16, start=T0 + 9, end=T0 + 9.05),
+        ],
+    )
+    report = analyze(cap)
+    f = _only(report)
+    assert f.rule_id == "session.upstream_timeout"
+    assert f.verdict == "Create Session refused because the PCRF did not answer the gateway."
+    assert "sent Gx CCR-I to the PCRF, and got no answer" in f.why
+    assert "Diameter connection" in f.fix
+
+
 def test_user_unknown_names_the_right_server(tmp_path):
     gx = _write(
         tmp_path, "gx.pcap", [(True, ccr(1, app=GX_APP)), (False, cca(1, app=GX_APP, result=5030))]
